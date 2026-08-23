@@ -1,0 +1,15 @@
+export const Type = {
+  display:      { fontFamily: 'Poppins_900Black',    fontSize: 30 },
+  h1:           { fontFamily: 'Poppins_900Black',    fontSize: 22 },
+  h2:           { fontFamily: 'Poppins_900Black',    fontSize: 20 },
+  emptyTitle:   { fontFamily: 'Poppins_900Black',    fontSize: 26 },
+  sectionLabel: { fontFamily: 'Poppins_700Bold',     fontSize: 12 },
+  fieldLabel:   { fontFamily: 'Poppins_600SemiBold', fontSize: 11, letterSpacing: 0.8 },
+  cardTitle:    { fontFamily: 'Poppins_700Bold',     fontSize: 12 },
+  cardDesc:     { fontFamily: 'Poppins_400Regular',  fontSize: 12 },
+  body:         { fontFamily: 'Poppins_400Regular',  fontSize: 14 },
+  bodySmall:    { fontFamily: 'Poppins_400Regular',  fontSize: 13 },
+  button:       { fontFamily: 'Poppins_600SemiBold', fontSize: 14 },
+  buttonLg:     { fontFamily: 'Poppins_600SemiBold', fontSize: 15 },
+  pillLabel:    { fontFamily: 'Poppins_600SemiBold', fontSize: 12 },
+} as const;
