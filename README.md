@@ -1,4 +1,4 @@
-# Split App
+# Open Tab
 
 A receipt-splitting app built with Expo and React Native. Scan a receipt (or enter it manually), assign items to people, and split the bill — with support for one-off tabs, multi-day trips, and recurring shared homes.
 
