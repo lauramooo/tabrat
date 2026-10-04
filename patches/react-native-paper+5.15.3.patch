@@ -1,0 +1,89 @@
+diff --git a/node_modules/react-native-paper/lib/commonjs/components/Portal/PortalHost.js b/node_modules/react-native-paper/lib/commonjs/components/Portal/PortalHost.js
+index 7328a40..313988b 100644
+--- a/node_modules/react-native-paper/lib/commonjs/components/Portal/PortalHost.js
++++ b/node_modules/react-native-paper/lib/commonjs/components/Portal/PortalHost.js
+@@ -109,9 +109,8 @@ class PortalHost extends React.Component {
+         unmount: this.unmount
+       }
+     }, /*#__PURE__*/React.createElement(_reactNative.View, {
+-      style: styles.container,
+-      collapsable: false,
+-      pointerEvents: "box-none"
++      style: [styles.container, { pointerEvents: "box-none" }],
++      collapsable: false
+     }, this.props.children), /*#__PURE__*/React.createElement(_PortalManager.default, {
+       ref: this.setManager
+     }));
+diff --git a/node_modules/react-native-paper/lib/commonjs/components/Portal/PortalManager.js b/node_modules/react-native-paper/lib/commonjs/components/Portal/PortalManager.js
+index cbaeacc..29dfd81 100644
+--- a/node_modules/react-native-paper/lib/commonjs/components/Portal/PortalManager.js
++++ b/node_modules/react-native-paper/lib/commonjs/components/Portal/PortalManager.js
+@@ -43,8 +43,7 @@ class PortalManager extends React.PureComponent {
+     }) => /*#__PURE__*/React.createElement(_reactNative.View, {
+       key: key,
+       collapsable: false /* Need collapsable=false here to clip the elevations, otherwise they appear above sibling components */,
+-      pointerEvents: "box-none",
+-      style: _reactNative.StyleSheet.absoluteFill
++      style: [_reactNative.StyleSheet.absoluteFill, { pointerEvents: "box-none" }]
+     }, children));
+   }
+ }
+diff --git a/node_modules/react-native-paper/lib/module/components/Portal/PortalHost.js b/node_modules/react-native-paper/lib/module/components/Portal/PortalHost.js
+index 4dcd504..ff1f370 100644
+--- a/node_modules/react-native-paper/lib/module/components/Portal/PortalHost.js
++++ b/node_modules/react-native-paper/lib/module/components/Portal/PortalHost.js
+@@ -101,9 +101,8 @@ export default class PortalHost extends React.Component {
+         unmount: this.unmount
+       }
+     }, /*#__PURE__*/React.createElement(View, {
+-      style: styles.container,
+-      collapsable: false,
+-      pointerEvents: "box-none"
++      style: [styles.container, { pointerEvents: "box-none" }],
++      collapsable: false
+     }, this.props.children), /*#__PURE__*/React.createElement(PortalManager, {
+       ref: this.setManager
+     }));
+diff --git a/node_modules/react-native-paper/lib/module/components/Portal/PortalManager.js b/node_modules/react-native-paper/lib/module/components/Portal/PortalManager.js
+index aa92642..5aa0a92 100644
+--- a/node_modules/react-native-paper/lib/module/components/Portal/PortalManager.js
++++ b/node_modules/react-native-paper/lib/module/components/Portal/PortalManager.js
+@@ -36,8 +36,7 @@ export default class PortalManager extends React.PureComponent {
+     }) => /*#__PURE__*/React.createElement(View, {
+       key: key,
+       collapsable: false /* Need collapsable=false here to clip the elevations, otherwise they appear above sibling components */,
+-      pointerEvents: "box-none",
+-      style: StyleSheet.absoluteFill
++      style: [StyleSheet.absoluteFill, { pointerEvents: "box-none" }]
+     }, children));
+   }
+ }
+diff --git a/node_modules/react-native-paper/src/components/Portal/PortalHost.tsx b/node_modules/react-native-paper/src/components/Portal/PortalHost.tsx
+index f884563..be06fce 100644
+--- a/node_modules/react-native-paper/src/components/Portal/PortalHost.tsx
++++ b/node_modules/react-native-paper/src/components/Portal/PortalHost.tsx
+@@ -124,9 +124,8 @@ export default class PortalHost extends React.Component<Props> {
+       >
+         {/* Need collapsable=false here to clip the elevations, otherwise they appear above Portal components */}
+         <View
+-          style={styles.container}
++          style={[styles.container, { pointerEvents: 'box-none' }]}
+           collapsable={false}
+-          pointerEvents="box-none"
+         >
+           {this.props.children}
+         </View>
+diff --git a/node_modules/react-native-paper/src/components/Portal/PortalManager.tsx b/node_modules/react-native-paper/src/components/Portal/PortalManager.tsx
+index cc2bdbe..c03b999 100644
+--- a/node_modules/react-native-paper/src/components/Portal/PortalManager.tsx
++++ b/node_modules/react-native-paper/src/components/Portal/PortalManager.tsx
+@@ -44,8 +44,7 @@ export default class PortalManager extends React.PureComponent<{}, State> {
+         collapsable={
+           false /* Need collapsable=false here to clip the elevations, otherwise they appear above sibling components */
+         }
+-        pointerEvents="box-none"
+-        style={StyleSheet.absoluteFill}
++        style={[StyleSheet.absoluteFill, { pointerEvents: 'box-none' }]}
+       >
+         {children}
+       </View>

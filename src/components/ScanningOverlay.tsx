@@ -1,10 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, Platform, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { ScissorIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 
 const CARD_W = 230;
+// Web has no native animation driver — passing useNativeDriver there just prints a warning
+// every time, so it's only enabled on native platforms where it actually does something.
+const NATIVE_DRIVER = Platform.OS !== 'web';
 
 export function ScissorAnimation({ label }: { label?: string }) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -12,9 +16,9 @@ export function ScissorAnimation({ label }: { label?: string }) {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 1700, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 1, duration: 1700, useNativeDriver: NATIVE_DRIVER }),
         Animated.delay(220),
-        Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: NATIVE_DRIVER }),
         Animated.delay(380),
       ]),
     );
@@ -42,8 +46,7 @@ export function ScissorAnimation({ label }: { label?: string }) {
             ))}
           </View>
           <Animated.View
-            pointerEvents="none"
-            style={[s.scissors, { transform: [{ translateX: scissorsX }] }]}
+            style={[s.scissors, { transform: [{ translateX: scissorsX }] }, { pointerEvents: 'none' }]}
           >
             <View style={s.scissorsIcon}>
               <ScissorIcon size={28} color={C.primary} />
@@ -65,7 +68,7 @@ export function ScissorAnimation({ label }: { label?: string }) {
 export function ScanningOverlay() {
   return (
     <View style={s.overlay}>
-      <ScissorAnimation label="Reading your receipt�" />
+      <ScissorAnimation label="Reading your receipt…" />
     </View>
   );
 }
@@ -133,8 +136,7 @@ const s = StyleSheet.create({
   },
   label: {
     color: C.textSub,
-    fontSize: 15,
-    fontFamily: 'Poppins_500Medium',
+    ...Type.labelMedium,
     letterSpacing: 0.2,
   },
 });

@@ -1,10 +1,11 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { PressBtn } from '@/components/PressBtn';
-import { BillTypeIcon, CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, ExpenseIcon, LinkIcon, MoneyIcon, MoreIcon, PencilIcon, PlusCircleIcon, PlusIcon, ReopenIcon, SearchIcon, SortIcon, TrashIcon, UserIcon } from '@/components/FigmaIcons';
+import { BillTypeIcon, CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, ExpenseIcon, LinkIcon, MoneyIcon, MoreIcon, PencilIcon, PlusCircleIcon, PlusIcon, ReopenIcon, SearchIcon, SendIcon, SortIcon, TrashIcon, UserIcon } from '@/components/FigmaIcons';
+import { ShareCodeModal } from '@/components/ShareCodeModal';
+import { ScreenHeaderTitle, ScreenSubHeader } from '@/components/FlowSteps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { createElement, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActionSheetIOS, Alert, Dimensions, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet,
@@ -12,17 +13,19 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Svg, { G, Path } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProgressBar, Text } from 'react-native-paper';
 import { Avatar } from '@/components/Avatar';
-import { Button, Card, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, DatePickerModal, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, IconBadge, Input, PayModal, RunningTotalsCard, SettlementRow } from '@/components/design';
+import { Button, Card, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, CurrencyPickerList, DateRangeCalendarModal, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, IconBadge, Input, PayModal, RunningTotalsCard, SearchInput, SettlementRow } from '@/components/design';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { calculateTripSettlement, fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator';
-import { fmtDate, fmtMonthYear } from '@/utils/date';
+import { fmtDateRange } from '@/utils/date';
 import { getCategoryData } from '@/utils/categoryColors';
+import { convertToBase, useExchangeRates } from '@/utils/currency';
 import { layoutPieSegments, roundedSegmentPath } from '@/utils/pieLayout';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
@@ -39,19 +42,6 @@ function getExpenseISODate(r: SplitRecord): string {
 
 const SCREEN_H = Dimensions.get('window').height;
 
-const CURRENCIES = [
-  { code: 'USD', symbol: '$' },
-  { code: 'EUR', symbol: '€' },
-  { code: 'GBP', symbol: '£' },
-  { code: 'JPY', symbol: '¥' },
-  { code: 'CAD', symbol: 'CA$' },
-  { code: 'AUD', symbol: 'A$' },
-  { code: 'CHF', symbol: 'Fr' },
-  { code: 'CNY', symbol: '¥' },
-  { code: 'MXN', symbol: 'MX$' },
-  { code: 'SGD', symbol: 'S$' },
-];
-
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
 function toISO(d: string): string {
@@ -62,17 +52,6 @@ function toISO(d: string): string {
     Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12',
   };
   return `${m[3]}-${months[m[1]] ?? '01'}-${m[2].padStart(2, '0')}`;
-}
-function fromISO(d: string): string {
-  if (!d) return '';
-  const [y, mo, day] = d.split('-');
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[parseInt(mo, 10) - 1]} ${parseInt(day, 10)}, ${y}`;
-}
-function parseDisplay(d: string): Date {
-  const iso = toISO(d);
-  const dt = iso ? new Date(iso + 'T00:00:00') : new Date(d);
-  return isNaN(dt.getTime()) ? new Date() : dt;
 }
 // ── Pie donut (SVG ring, rounded segment caps) ─────────────────────────────────
 
@@ -115,7 +94,7 @@ function PieDonut({ data, centerText, currency }: {
   return (
     <View style={{ width: PIE_SIZE, height: PIE_SIZE }}>
       <Svg width={PIE_SIZE} height={PIE_SIZE} viewBox={`0 0 ${PIE_SIZE} ${PIE_SIZE}`}>
-        <G rotation={-90} origin={`${center}, ${center}`}>
+        <G transform={`rotate(-90, ${center}, ${center})`}>
           {paintOrder.map((d) => {
             const startAngle = -d.offset / radius;
             const endAngle = (-d.offset + d.len) / radius;
@@ -130,7 +109,7 @@ function PieDonut({ data, centerText, currency }: {
                   setTooltip((prev) => (prev?.label === d.label ? null : { label: d.label, value: d.value, textColor: d.textColor }));
                 }}
                 onLongPress={() => { wasLongPress.current = true; lightHaptic(); setTooltip({ label: d.label, value: d.value, textColor: d.textColor }); }}
-                onPressOut={() => { if (wasLongPress.current) { setTooltip(null); wasLongPress.current = false; } }}
+                {...(Platform.OS !== 'web' ? { onPressOut: () => { if (wasLongPress.current) { setTooltip(null); wasLongPress.current = false; } } } : null)}
               />
             );
           })}
@@ -138,8 +117,8 @@ function PieDonut({ data, centerText, currency }: {
       </Svg>
       <View style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        justifyContent: 'center', alignItems: 'center',
-      }} pointerEvents="none">
+        justifyContent: 'center', alignItems: 'center', pointerEvents: 'none',
+      }}>
         {tooltip ? (
           <View style={s.pieTooltip}>
             <Text style={[s.pieTooltipAmt, { color: tooltip.textColor }]}>{fmt(tooltip.value, currency)}</Text>
@@ -155,53 +134,6 @@ function PieDonut({ data, centerText, currency }: {
 
 // ── Edit trip modal ───────────────────────────────────────────────────────────
 
-function DatePickerRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const [showNative, setShowNative] = useState(false);
-  const [iosDate, setIosDate] = useState(new Date());
-  const openPicker = () => {
-    setIosDate(value ? parseDisplay(value) : new Date());
-    setShowNative(true);
-  };
-
-  const onNativeChange = (_: any, date?: Date) => {
-    if (Platform.OS === 'android') { setShowNative(false); if (date) onChange(fmtDate(date)); }
-    else if (date) setIosDate(date);
-  };
-
-  return (
-    <>
-      {Platform.OS === 'web' ? (
-        <View style={[s.editDateBox, { position: 'relative' }]}>
-          <CalendarIcon size={15} color={C.text} />
-          <Text style={[s.editDateText, !value && { color: C.textDim }]}>{value || label}</Text>
-          {createElement('input', {
-            type: 'date',
-            value: toISO(value),
-            onChange: (e: any) => { const v = e.target.value; if (v) onChange(fromISO(v)); },
-            style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0, cursor: 'pointer', border: 'none', outline: 'none' } as any,
-          })}
-        </View>
-      ) : (
-        <PressBtn style={s.editDateBox} onPress={openPicker} activeOpacity={0.8}>
-          <CalendarIcon size={15} color={C.text} />
-          <Text style={[s.editDateText, !value && { color: C.textDim }]}>{value || label}</Text>
-          {value ? <PressBtn onPress={() => onChange('')} hitSlop={10}><CloseCircleIcon size={15} color={C.textDim} /></PressBtn> : null}
-        </PressBtn>
-      )}
-      {showNative && Platform.OS === 'android' && <DateTimePicker value={iosDate} mode="date" display="calendar" onChange={onNativeChange} />}
-      {Platform.OS === 'ios' && (
-        <DatePickerModal
-          visible={showNative}
-          value={iosDate}
-          onChange={(d) => onChange(fmtDate(d))}
-          onClose={() => setShowNative(false)}
-          title={label}
-        />
-      )}
-    </>
-  );
-}
-
 function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }: {
   visible: boolean;
   trip: { id: string; name: string; emoji: string; startDate: string; endDate?: string; people?: string[]; currencies?: string[]; currency?: string; budget?: number; groupBudget?: number } | null;
@@ -216,6 +148,7 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
   const [emoji, setEmoji] = useState('✈️');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [dateModalOpen, setDateModalOpen] = useState(false);
   const [currencies, setCurrencies] = useState<string[]>(['USD']);
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [currencyDropPos, setCurrencyDropPos] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -223,6 +156,7 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
   const [people, setPeople] = useState<string[]>([]);
   const [friendSearch, setFriendSearch] = useState('');
   const [friendDropOpen, setFriendDropOpen] = useState(false);
+  const [addPressed, setAddPressed] = useState(false);
   const friendInputRef = useRef<TextInput>(null);
   const [friendsExpanded, setFriendsExpanded] = useState(true);
   const [newCatInput, setNewCatInput] = useState('');
@@ -302,11 +236,24 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
     >
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: SCREEN_H * 0.6 }}>
         <FieldLabel>DATES</FieldLabel>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
-          <DatePickerRow label="Start" value={startDate} onChange={setStartDate} />
-          <Text style={{ color: C.textDim, fontSize: 15, fontFamily: 'Poppins_500Medium' }}>–</Text>
-          <DatePickerRow label="End" value={endDate} onChange={setEndDate} />
-        </View>
+        <PressBtn style={[s.editDateBox, { marginBottom: 16 }]} onPress={() => setDateModalOpen(true)} activeOpacity={0.8}>
+          <CalendarIcon size={15} color={C.text} />
+          <Text style={[s.editDateText, !startDate && { color: C.textDim }]} numberOfLines={1}>
+            {startDate ? fmtDateRange(startDate, endDate) : 'Choose date(s)'}
+          </Text>
+          {startDate ? (
+            <PressBtn onPress={() => { setStartDate(''); setEndDate(''); }} hitSlop={10}>
+              <CloseCircleIcon size={15} color={C.textDim} />
+            </PressBtn>
+          ) : null}
+        </PressBtn>
+        <DateRangeCalendarModal
+          visible={dateModalOpen}
+          startDate={startDate}
+          endDate={endDate}
+          onConfirm={(s, e) => { setStartDate(s); setEndDate(e); setDateModalOpen(false); }}
+          onClose={() => setDateModalOpen(false)}
+        />
         <FieldLabel>CURRENCY</FieldLabel>
         <Card padding={0} row={false} radius={10} style={{ marginBottom: 16 }}>
           <PressBtn
@@ -316,7 +263,12 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
               selectionHaptic();
               if (currencyBtnRef.current) {
                 currencyBtnRef.current.measureInWindow((x, y, w, h) => {
-                  setCurrencyDropPos({ top: y + h + 4, left: x, width: w });
+                  // The dropdown needs room for "$  USD · US Dollar", which is wider than the
+                  // compact currency button itself — using the button's own width made every row
+                  // wrap to two lines. Widen it (anchored to the button's right edge so it doesn't
+                  // run off-screen) rather than reusing that narrow measurement.
+                  const width = Math.max(w, 280);
+                  setCurrencyDropPos({ top: y + h + 4, left: Math.max(0, x + w - width), width });
                   setCurrencyOpen(true);
                 });
               } else {
@@ -332,23 +284,8 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
               : <ChevronDownCircleIcon color={C.text} size={15} />}
           </PressBtn>
         </Card>
-        <Dropdown visible={currencyOpen} position={currencyDropPos} onClose={() => setCurrencyOpen(false)}>
-          {CURRENCIES.map((c, i) => {
-            const active = currencies.includes(c.code);
-            return (
-              <DropdownRow
-                key={c.code}
-                onPress={() => toggleCurrency(c.code)}
-                divider={i > 0}
-                trailing={active ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
-              >
-                <Text style={s.dropdownRowText}>
-                  <Text style={{ color: C.text }}>{c.symbol}</Text>
-                  <Text style={{ color: C.textSub }}>  {c.code}</Text>
-                </Text>
-              </DropdownRow>
-            );
-          })}
+        <Dropdown visible={currencyOpen} position={currencyDropPos} onClose={() => setCurrencyOpen(false)} scroll={false}>
+          <CurrencyPickerList selected={currencies} onToggle={toggleCurrency} />
         </Dropdown>
 
         <FieldLabel>MY BUDGET</FieldLabel>
@@ -386,7 +323,7 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
         </Card>
 
         <PressBtn style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }} onPress={() => setFriendsExpanded((o) => !o)} activeOpacity={1} noShadow>
-          <FieldLabel>FRIENDS</FieldLabel>
+          <FieldLabel>RATS</FieldLabel>
           {friendsExpanded
             ? <ChevronUpCircleIcon color={C.text} size={15} />
             : <ChevronDownCircleIcon color={C.text} size={15} />}
@@ -412,33 +349,33 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
             )}
             <View style={{ position: 'relative', zIndex: showDrop ? 20 : 0, marginBottom: 16 }}>
               <Pressable onPress={() => friendInputRef.current?.focus()}>
-                <Card padding={0} row={false} radius={10}>
-                  <View style={s.friendAddRow}>
-                    <SearchIcon color={C.text} size={15} />
-                    <TextInput
-                      ref={friendInputRef}
-                      style={[s.friendAddInput, { outlineWidth: 0 } as any]}
-                      value={friendSearch}
-                      onChangeText={setFriendSearch}
-                      onFocus={() => setFriendDropOpen(true)}
-                      onBlur={() => setTimeout(() => setFriendDropOpen(false), 150)}
-                      placeholder="Search friends or groups"
-                      placeholderTextColor={C.textDim}
-                      onSubmitEditing={() => { addPerson(friendSearch); setFriendSearch(''); setFriendDropOpen(false); }}
-                      returnKeyType="done" />
-                    {friendSearch.trim() ? (
-                      <PressBtn onPress={() => { addPerson(friendSearch); setFriendSearch(''); setFriendDropOpen(false); }} hitSlop={8} activeOpacity={0.7}>
-                        <PlusCircleIcon color={C.primary} size={15} />
-                      </PressBtn>
-                    ) : (
-                      <PressBtn onPress={() => setFriendDropOpen((o) => !o)} hitSlop={8} activeOpacity={0.7}>
-                        {friendDropOpen
-                          ? <ChevronUpCircleIcon color={C.text} size={15} />
-                          : <ChevronDownCircleIcon color={C.text} size={15} />}
-                      </PressBtn>
-                    )}
-                  </View>
-                </Card>
+                <SearchInput
+                  ref={friendInputRef}
+                  value={friendSearch}
+                  onChangeText={setFriendSearch}
+                  onFocus={() => setFriendDropOpen(true)}
+                  onBlur={() => setTimeout(() => setFriendDropOpen(false), 150)}
+                  placeholder="Search rats or groups"
+                  onSubmitEditing={() => { addPerson(friendSearch); setFriendSearch(''); setFriendDropOpen(false); }}
+                  returnKeyType="done"
+                  trailing={friendSearch.trim() ? (
+                    <PressBtn
+                      onPress={() => { addPerson(friendSearch); setFriendSearch(''); setFriendDropOpen(false); }}
+                      onPressIn={() => setAddPressed(true)}
+                      onPressOut={() => setAddPressed(false)}
+                      hitSlop={8}
+                      activeOpacity={0.7}
+                    >
+                      <PlusCircleIcon color={C.primary} size={15} strokeWidth={1.8} filled={addPressed} />
+                    </PressBtn>
+                  ) : (
+                    <PressBtn onPress={() => setFriendDropOpen((o) => !o)} hitSlop={8} activeOpacity={0.7}>
+                      {friendDropOpen
+                        ? <ChevronUpCircleIcon color={C.text} size={15} />
+                        : <ChevronDownCircleIcon color={C.text} size={15} />}
+                    </PressBtn>
+                  )}
+                />
               </Pressable>
               <Dropdown mode="inline" visible={showDrop} position={{ top: InputMetrics.height + 4 }} onClose={() => setFriendDropOpen(false)}>
                 {filteredFriends.map((f) => (
@@ -491,7 +428,7 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
                   </PressBtn>
                 </View>
                 {isEditing && renameCount > 0 && (
-                  <Text style={{ fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, lineHeight: 16, paddingHorizontal: 14, paddingBottom: 10 }}>
+                  <Text style={{ ...Type.cardDesc, color: C.textSub, lineHeight: 16, paddingHorizontal: 14, paddingBottom: 10 }}>
                     Editing this category will apply the change to all expenses with this category ({renameCount} expense{renameCount !== 1 ? 's' : ''}).
                   </Text>
                 )}
@@ -573,7 +510,7 @@ function FriendsModal({ visible, people, onClose, onSave }: {
     lightHaptic(); setLocal((p) => [...p, t]); setInput('');
   };
   return (
-    <CenteredModal visible={visible} onClose={onClose} title={<Text style={[s.modalTitle, { marginBottom: 0 }]}>Friends on this trip</Text>}>
+    <CenteredModal visible={visible} onClose={onClose} title={<Text style={[s.modalTitle, { marginBottom: 0 }]}>Rats on this trip</Text>}>
       {available.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
           {available.map((f) => (
@@ -620,6 +557,11 @@ function FriendsModal({ visible, people, onClose, onSave }: {
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  // The actions menu renders in a full-screen Modal, ignoring the header's own layout — position
+  // it using the safe-area inset plus the standard native header content height so it lands just
+  // under the header button regardless of device, matching BillHeader's actions menu.
+  const actionsTop = insets.top + (Platform.OS === 'ios' ? 44 : 56) + 6;
   const { trips, history, tripPayments, updateTrip, deleteTrip, addTripPayment, removeTripPaymentsFor, closeTrip } = useSplitStore();
   const [scopePerson, setScopePerson] = useState(''); // '' = everyone, else = person name
   const [scopeDropOpen, setScopeDropOpen] = useState(false);
@@ -630,6 +572,7 @@ export default function TripDetailScreen() {
   const [editHeaderPreview, setEditHeaderPreview] = useState<{ name: string; startDate: string; endDate: string } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [actionsModal, setActionsModal] = useState(false);
+  const [shareModal, setShareModal] = useState(false);
   const [payModal, setPayModal] = useState<{ from: string; to: string; amount: number } | null>(null);
   const [reopenConfirm, setReopenConfirm] = useState<{ from: string; to: string } | null>(null);
   const [myName, setMyName] = useState('');
@@ -650,24 +593,48 @@ export default function TripDetailScreen() {
   }, []);
 
   const trip = trips.find((t) => t.id === id);
+  const tripCurrency = trip?.currency ?? 'USD';
   const tabs = history
     .filter((r) => r.tripId === id)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const myTripPayments = (tripPayments ?? []).filter((p) => p.tripId === id);
 
+  // Multi-currency conversion — every trip-level total below (settlement, per-person totals,
+  // category breakdown, budget tracking) needs expenses converted into one common currency
+  // before summing, not just labeled with the trip's symbol after the fact. Only fetches rates
+  // (and only converts) when this trip's expenses actually span more than one currency — the
+  // common single-currency case never touches the network and behaves exactly as before.
+  const needsConversion = useMemo(
+    () => new Set(tabs.map((t) => t.currency ?? tripCurrency)).size > 1,
+    [tabs, tripCurrency],
+  );
+  const exchangeRates = useExchangeRates(tripCurrency, needsConversion);
+  const convertedTabs = useMemo(() => {
+    if (!needsConversion) return tabs;
+    return tabs.map((t) => {
+      const from = t.currency ?? tripCurrency;
+      if (from === tripCurrency) return t;
+      return {
+        ...t,
+        total: convertToBase(t.total, from, tripCurrency, exchangeRates),
+        personAmounts: t.personAmounts?.map((pa) => ({ ...pa, amount: convertToBase(pa.amount, from, tripCurrency, exchangeRates) })),
+      };
+    });
+  }, [tabs, needsConversion, exchangeRates, tripCurrency]);
+
   // Build settlement input that includes recorded payments
   const settlementInput = useMemo(() => [
-    ...tabs.map((t) => ({ personAmounts: t.personAmounts, paidByName: t.paidByName })),
+    ...convertedTabs.map((t) => ({ personAmounts: t.personAmounts, paidByName: t.paidByName })),
     ...myTripPayments.map((p) => ({
       paidByName: p.from,
       personAmounts: [{ name: p.to, amount: p.amount }],
     })),
-  ], [tabs, myTripPayments]);
+  ], [convertedTabs, myTripPayments]);
 
   const { personTotals, settlement } = useMemo(() => {
     const totals: Record<string, number> = {};
-    for (const tab of tabs) {
+    for (const tab of convertedTabs) {
       for (const { name, amount } of tab.personAmounts ?? []) {
         totals[name] = (totals[name] ?? 0) + amount;
       }
@@ -676,7 +643,7 @@ export default function TripDetailScreen() {
       .sort((a, b) => b[1] - a[1])
       .map(([name, amount]) => ({ name, amount }));
     return { personTotals, settlement: calculateTripSettlement(settlementInput) };
-  }, [tabs, settlementInput]);
+  }, [convertedTabs, settlementInput]);
 
   const grandTotal = tabs.reduce((s, t) => s + t.total, 0);
 
@@ -690,8 +657,8 @@ export default function TripDetailScreen() {
   // the greedy settle-up algorithm. Computed against the payment-less base settlement so a
   // pair's "original amount owed" is stable even as other pairs' netting shifts around it.
   const baseSettlement = useMemo(() => calculateTripSettlement(
-    tabs.map((t) => ({ personAmounts: t.personAmounts, paidByName: t.paidByName })),
-  ), [tabs]);
+    convertedTabs.map((t) => ({ personAmounts: t.personAmounts, paidByName: t.paidByName })),
+  ), [convertedTabs]);
   const closedSettlement = useMemo(() => {
     const activeKeys = new Set(settlement.map((t) => `${t.from}→${t.to}`));
     return baseSettlement
@@ -708,18 +675,18 @@ export default function TripDetailScreen() {
 
   // Category breakdown filtered by selected person (or everyone) — shared with the trip
   // expenses page so the donut and the expense-card category chips always agree on colors.
-  const { catData, catTotal } = useMemo(() => getCategoryData(tabs, scopePerson), [tabs, scopePerson]);
+  const { catData, catTotal } = useMemo(() => getCategoryData(convertedTabs, scopePerson), [convertedTabs, scopePerson]);
 
   const { myBudgetSpent, groupBudgetSpent } = useMemo(() => {
     let mine = 0;
     let group = 0;
-    for (const tab of tabs) {
+    for (const tab of convertedTabs) {
       const pa = tab.personAmounts?.find((p) => p.name === myName);
       mine += pa?.amount ?? 0;
       group += tab.total;
     }
     return { myBudgetSpent: mine, groupBudgetSpent: group };
-  }, [tabs, myName]);
+  }, [convertedTabs, myName]);
 
   if (!trip) {
     return (
@@ -730,7 +697,6 @@ export default function TripDetailScreen() {
   }
 
   const tripPeople = sortWithMeFirst(trip.people ?? [], myName);
-  const tripCurrency = trip.currency ?? 'USD';
 
   const handleSaveFriends = (people: string[]) => {
     if (!trip) return;
@@ -760,21 +726,15 @@ export default function TripDetailScreen() {
         headerTitleAlign: 'center',
         headerTransparent: false,
         headerStyle: { backgroundColor: C.bg },
-        headerTitle: () => {
-          const hName = editHeaderPreview?.name || trip.name;
-          const hStart = editHeaderPreview ? editHeaderPreview.startDate : trip.startDate;
-          const hEnd = editHeaderPreview ? editHeaderPreview.endDate : trip.endDate;
-          return (
-            <View style={{ alignItems: 'center' }}>
-              <Text style={s.hdrTitle}>{hName}</Text>
-              {!!(hStart || hEnd) && (
-                <Text style={s.hdrDate}>{hStart}{hEnd ? ` – ${hEnd}` : ''}</Text>
-              )}
-            </View>
-          );
-        },
+        // _layout.tsx sets a static `title` for this route — headerTitle:()=>null alone doesn't
+        // suppress that string, so it was showing stacked with the title row below.
+        title: '',
+        headerTitle: () => null,
+        // back() (not a hardcoded replace to the trips list) so this returns to wherever the
+        // trip was actually opened from — Feed or Trips — instead of always landing on Trips
+        // regardless of origin. Both screens reach this route via push, so history is intact.
         headerLeft: () => (
-          <CircleIconButton variant="back" size={28} color={C.primary} onPress={() => router.replace('/(tabs)/trips' as any)} style={{ paddingHorizontal: 12 }} />
+          <CircleIconButton variant="back" size={28} color={C.primary} onPress={() => router.back()} style={{ paddingHorizontal: 12 }} />
         ),
         headerRight: () => (
           <PressBtn onPress={() => setActionsModal(true)} activeOpacity={0.5} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
@@ -782,6 +742,13 @@ export default function TripDetailScreen() {
           </PressBtn>
         ),
       }} />
+      <ScreenSubHeader>
+        <ScreenHeaderTitle
+          name={editHeaderPreview?.name || trip.name}
+          date={editHeaderPreview ? editHeaderPreview.startDate : trip.startDate}
+          endDate={editHeaderPreview ? editHeaderPreview.endDate : trip.endDate}
+        />
+      </ScreenSubHeader>
 
       {/* ── Friend bubbles strip ── */}
       {tripPeople.length > 0 && (
@@ -802,7 +769,7 @@ export default function TripDetailScreen() {
       {/* ── Total + person scope dropdown (fixed, above scroll) ── */}
       <View style={s.totalBar}>
           <View>
-            <Text style={s.totalBarLabel}>TOTAL</Text>
+            <Text style={s.totalBarLabel}>TOTAL{needsConversion ? ' · CONVERTED' : ''}</Text>
             <Text style={s.totalBarAmt}>{getCurrencySymbol(tripCurrency)}{Math.round(catTotal)}</Text>
           </View>
           <PressBtn
@@ -829,7 +796,7 @@ export default function TripDetailScreen() {
             key={opt.value || '__everyone'}
             onPress={() => { selectionHaptic(); setScopePerson(opt.value); setScopeDropOpen(false); }}
             divider={i > 0}
-            trailing={scopePerson === opt.value ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+            trailing={scopePerson === opt.value ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
           >
             <Text style={[s.scopeDropItemText, scopePerson === opt.value && { color: C.primary }]}>{opt.label}</Text>
           </DropdownRow>
@@ -878,7 +845,7 @@ export default function TripDetailScreen() {
                       <Text style={[s.budgetAmt, over && { color: C.error }]}>{getCurrencySymbol(tripCurrency)}{Math.round(Math.abs(remaining))}</Text>
                       <Text style={s.budgetSub}> {over ? 'over budget' : 'left to spend'}</Text>
                     </Text>
-                    <ProgressBar progress={Math.min(1, myBudgetSpent / trip.budget)} color={over ? C.error : '#F7D76A'} style={s.budgetBar} />
+                    <ProgressBar progress={Math.min(1, myBudgetSpent / trip.budget)} color={over ? C.error : C.yellow} style={s.budgetBar} />
                   </View>
                 );
               })()}
@@ -891,7 +858,7 @@ export default function TripDetailScreen() {
                       <Text style={[s.budgetAmt, over && { color: C.error }]}>{getCurrencySymbol(tripCurrency)}{Math.round(Math.abs(remaining))}</Text>
                       <Text style={s.budgetSub}> {over ? 'over budget' : 'left to spend'}</Text>
                     </Text>
-                    <ProgressBar progress={Math.min(1, groupBudgetSpent / trip.groupBudget)} color={over ? C.error : '#F7D76A'} style={s.budgetBar} />
+                    <ProgressBar progress={Math.min(1, groupBudgetSpent / trip.groupBudget)} color={over ? C.error : C.yellow} style={s.budgetBar} />
                   </View>
                 );
               })()}
@@ -992,14 +959,24 @@ export default function TripDetailScreen() {
         <View style={{ height: 8 }} />
       </ScrollView>
 
-      <View style={s.footer}>
+      <View style={[s.footer, { flexDirection: 'row', gap: 10 }]}>
         <Button
           variant="primary"
           size="big"
           label="Expenses"
           icon={<ExpenseIcon color={C.text} size={18} />}
           onPress={() => { selectionHaptic(); router.push({ pathname: '/trip/expenses' as any, params: { tripId: id! } }); }}
+          style={{ flex: 1 }}
         />
+        {/* Quick-add — jumps straight to logging an expense without going through the expenses
+            list page first, for the common case of just wanting to add one thing fast. */}
+        <PressBtn
+          style={s.quickAddCircle}
+          onPress={() => { selectionHaptic(); router.push({ pathname: '/trip/manual-entry' as any, params: { tripId: id!, direct: 'true' } }); }}
+          activeOpacity={0.85}
+        >
+          <PlusIcon color={C.text} size={22} />
+        </PressBtn>
       </View>
 
       <FriendsModal visible={friendsModalVisible} people={tripPeople}
@@ -1028,10 +1005,14 @@ export default function TripDetailScreen() {
       {/* ── Actions menu ── */}
       <Modal visible={actionsModal} transparent animationType="fade" onRequestClose={() => setActionsModal(false)}>
         <Pressable style={s.actionsBackdrop} onPress={() => setActionsModal(false)}>
-          <View style={s.actionsCard}>
+          <View style={[s.actionsCard, { top: actionsTop }]}>
             <PressBtn style={s.actionsRow} onPress={() => { setActionsModal(false); setEditModalVisible(true); }} activeOpacity={0.6}>
               <PencilIcon color={C.textSub} size={17} />
               <Text style={s.actionsRowText}>Edit</Text>
+            </PressBtn>
+            <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); setShareModal(true); }} activeOpacity={0.6}>
+              <SendIcon color={C.textSub} size={17} />
+              <Text style={s.actionsRowText}>Share</Text>
             </PressBtn>
             <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); closeTrip(trip.id); router.back(); }} activeOpacity={0.6}>
               <CheckCircleIcon color={C.textSub} size={17} />
@@ -1044,6 +1025,14 @@ export default function TripDetailScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      <ShareCodeModal
+        visible={shareModal}
+        onClose={() => setShareModal(false)}
+        title="Share trip"
+        code={trip.joinCode}
+        message={`Join my trip "${trip.name}" on Tab Rat! Code: ${trip.joinCode}`}
+      />
 
       <ConfirmModal
         visible={deleteConfirm}
@@ -1083,35 +1072,32 @@ const s = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingBottom: 16 },
 
-  // Nav header
-  hdrTitle: { fontFamily: 'Poppins_900Black', fontSize: 22, color: C.text, letterSpacing: 0.3 },
-  hdrDate: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: -4 },
   friendStrip: { flexDirection: 'row', justifyContent: 'center', paddingTop: 0, paddingBottom: 4 },
   hdrAvatarRow: { flexDirection: 'row', marginTop: 4 },
   hdrAvatar: { width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: C.bg },
 
   // Total bar + scope dropdown
   totalBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
-  totalBarLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 11, color: C.textSub, letterSpacing: 0.8 },
-  totalBarAmt: { fontFamily: 'Poppins_900Black', fontSize: 26, color: C.text, lineHeight: 30 },
+  totalBarLabel: { ...Type.fieldLabel, color: C.textSub },
+  totalBarAmt: { ...Type.h2, color: C.text, lineHeight: 30 },
   scopeDrop: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
-  scopeDropText: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: C.text },
-  scopeDropItemText: { fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
+  scopeDropText: { ...Type.pillLabel, color: C.text },
+  scopeDropItemText: { ...Type.labelMedium, color: C.text },
 
   // Actions dropdown
   actionsBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
-  actionsCard: { position: 'absolute', top: 54, right: 10, backgroundColor: C.bg, borderRadius: 14, width: 210, overflow: 'hidden' },
+  actionsCard: { position: 'absolute', right: 10, backgroundColor: C.bg, borderRadius: 14, width: 210, overflow: 'hidden' },
   actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
-  actionsRowText: { fontFamily: 'Poppins_400Regular', fontSize: 16, color: C.text },
+  actionsRowText: { ...Type.bodySmall, color: C.text },
   actionsRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border },
 
   // Sections
   section: { paddingHorizontal: 16, paddingTop: 16 },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  sectionLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 11, color: C.textSub, letterSpacing: 0.8, marginBottom: 10 },
+  sectionLabel: { ...Type.fieldLabel, color: C.textSub, marginBottom: 10 },
   budgetRow: { gap: 6 },
-  budgetAmt: { fontFamily: 'Poppins_700Bold', fontSize: 13, color: C.text },
-  budgetSub: { fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.textSub },
+  budgetAmt: { ...Type.cardTitle, color: C.text },
+  budgetSub: { ...Type.cardDesc, color: C.textSub },
   budgetBar: { height: 8, borderRadius: 4, backgroundColor: C.border },
 
   // Pie
@@ -1121,40 +1107,40 @@ const s = StyleSheet.create({
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   legendDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
   legendLabel: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 11, color: C.text },
-  legendAmt: { fontFamily: 'Poppins_700Bold', fontSize: 11, color: C.text, width: 62 },
+  legendAmt: { ...Type.cardTitle, color: C.text, width: 62 },
   pieCenterText: { fontFamily: 'Poppins_900Black', fontSize: 12, color: C.text, textAlign: 'center' },
-  pieTooltip: { alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
+  pieTooltip: { alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, boxShadow: '0px 3px 8px rgba(0,0,0,0.15)', elevation: 5 },
   pieTooltipAmt: { fontFamily: 'Poppins_900Black', fontSize: 13 },
   pieTooltipLabel: { fontFamily: 'Poppins_500Medium', fontSize: 10, color: C.textSub, maxWidth: 80 },
-  noDataNote: { fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.textDim, textAlign: 'center', paddingVertical: 16 },
+  noDataNote: { ...Type.cardDesc, color: C.textDim, textAlign: 'center', paddingVertical: 16 },
 
-  noSettlementNote: { fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.textDim, textAlign: 'center', marginTop: 12, marginHorizontal: 16, fontStyle: 'italic' },
+  noSettlementNote: { ...Type.cardDesc, color: C.textDim, textAlign: 'center', marginTop: 12, marginHorizontal: 16, fontStyle: 'italic' },
 
 
   emptyScreen: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyTitle: { fontFamily: 'Poppins_900Black', fontSize: 22, color: C.text },
+  emptyTitle: { ...Type.emptyTitle, color: C.text },
 
   // Footer
   footer: { padding: 16, paddingTop: 8 },
+  quickAddCircle: { width: 54, height: 54, borderRadius: 27, backgroundColor: C.yellow, justifyContent: 'center', alignItems: 'center' },
 
   // Modals (shared)
-  modalTitle: { fontFamily: 'Poppins_700Bold', fontSize: 17, color: C.text, marginBottom: 16, flexShrink: 1 },
+  modalTitle: { ...Type.cardTitle, color: C.text, marginBottom: 16, flexShrink: 1 },
 
-  editInput: { fontFamily: 'Poppins_500Medium', fontSize: 15 },
+  editInput: { ...Type.labelMedium },
   editDateRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: InputMetrics.height },
   editDateBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: InputMetrics.radius, height: InputMetrics.height, paddingHorizontal: 14 },
-  editDateText: { flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text },
-  moneyPrefix: { fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.textSub },
+  editDateText: { flex: 1, minWidth: 0, ...Type.bodySmall, color: C.text },
+  moneyPrefix: { ...Type.bodySmall, color: C.textSub },
   moneyCard: { marginBottom: 16, borderWidth: 1.5, borderColor: 'transparent' },
   moneyCardFocused: { borderColor: C.text },
-  dropdownRowText: { fontFamily: 'Poppins_500Medium', fontSize: 15, color: C.text },
-  friendListName: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 15, color: C.text },
+  friendListName: { flex: 1, ...Type.labelMedium, color: C.text },
   friendAddRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: InputMetrics.height, gap: 10 },
-  friendAddInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_500Medium', fontSize: 15, color: C.text },
-  friendDropName: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
-  friendDropSub: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textDim },
+  friendAddInput: { flex: 1, minWidth: 0, ...Type.labelMedium, color: C.text },
+  friendDropName: { flex: 1, ...Type.labelMedium, color: C.text },
+  friendDropSub: { ...Type.cardDesc, color: C.textDim },
   addPersonBtn: { width: 46, height: 46, borderRadius: 10, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center' },
   friendQuickChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: C.card },
-  friendQuickText: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.textSub },
+  friendQuickText: { ...Type.labelMedium, color: C.textSub },
 });
 

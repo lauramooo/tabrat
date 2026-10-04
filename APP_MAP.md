@@ -1,4 +1,4 @@
-# Split App — Page & Function Map
+# Tab Rat — Page & Function Map
 
 This is the target IA you spec'd out, mapped against the actual code in `src/app` and `src/store/useSplitStore.ts`. Where a page already exists, the route is noted along with what's built vs. what's new work. Treat this as the source of truth — update it before adding a feature, then build.
 

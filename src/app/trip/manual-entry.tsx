@@ -7,7 +7,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { ActionSheetIOS, Alert, Platform } from 'react-native';
 import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Image, KeyboardAvoidingView,
+  Image,
   ScrollView, StyleSheet, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import { Text } from 'react-native-paper';
 import { Button, Card, CenteredModal, CircleIconButton, DatePickerModal, Dropdown, DropdownRow, FieldLabel, Input } from '@/components/design';
 import { CalendarIcon, CameraIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, PencilIcon, PlusCircleIcon, SearchIcon, SortIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
@@ -22,6 +23,7 @@ import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator';
 import { fmtDate } from '@/utils/date';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
+import { applyTextShortcuts } from '@/utils/text';
 
 // -- Date helpers --------------------------------------------------------------
 
@@ -137,9 +139,9 @@ function CategoryRenameModal({ cat, onClose }: { cat: string | null; onClose: ()
           Editing this category will apply the change to all expenses with this category ({count} expense{count !== 1 ? 's' : ''}).
         </Text>
       )}
-      <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-        <Button variant="secondary" label="Cancel" onPress={onClose} />
-        <Button variant="primary" label="Save" onPress={handleSave} />
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
+        <Button variant="secondary" size="small" label="Cancel" onPress={onClose} />
+        <Button variant="primary" size="small" label="Save" onPress={handleSave} />
       </View>
     </CenteredModal>
   );
@@ -171,6 +173,7 @@ export default function ManualEntryScreen() {
   const [category, setCategory] = useState<string | null>(null);
   const [catOpen, setCatOpen] = useState(false);
   const [catFilter, setCatFilter] = useState('');
+  const [catFilterFocused, setCatFilterFocused] = useState(false);
   const [catDropY, setCatDropY] = useState(0);
   const [renamingCat, setRenamingCat] = useState<string | null>(null);
   const catCardRef = useRef<View>(null);
@@ -275,14 +278,17 @@ export default function ManualEntryScreen() {
 
   const toggleParticipant = (name: string) => {
     selectionHaptic();
-    setParticipants((prev) => {
-      const next = prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name];
-      if (paidByName && !next.includes(paidByName)) setPaidByName(next[0] ?? null);
-      return next;
-    });
+    // paidByName is intentionally independent of participants — someone can pay without
+    // splitting the cost themselves, so removing them as a participant shouldn't clear them
+    // as the payer.
+    setParticipants((prev) => (prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name]));
   };
 
-  const goBack = () => router.replace({ pathname: '/trip/expenses', params: { tripId: tripId! } } as any);
+  // Deliberately always lands on the trip's home page rather than popping back to whatever
+  // pushed this screen (the expenses list, a specific expense, trip detail's quick-add) — the
+  // desired behavior here is "leaving this screen always returns to the trip," not "retrace my
+  // steps." replace (not push) so it doesn't grow the stack every time this screen is used.
+  const goBack = () => router.replace({ pathname: '/trip/[id]', params: { id: tripId! } } as any);
 
   const handleSave = () => {
     if (!expenseName.trim()) { setError('Enter an expense name.'); return; }
@@ -316,7 +322,12 @@ export default function ManualEntryScreen() {
         ),
       }} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* No KeyboardAvoidingView here — it was fighting the ScrollView's own native "scroll the
+          focused field into view" behavior on iOS, and the combination could collapse the whole
+          scroll area to almost nothing when the keyboard opened (the same failure mode found and
+          fixed the same way in AuthGate.tsx earlier). The plain ScrollView already lifts whatever
+          field is focused just above the keyboard on its own. */}
+      <View style={{ flex: 1 }}>
         <View style={{ flex: 1, position: 'relative' }}>
         <ScrollView style={s.scroll} contentContainerStyle={s.content}
           keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -328,7 +339,7 @@ export default function ManualEntryScreen() {
               <TextInput
                 style={[s.detailInput, { outlineWidth: 0 } as any]}
                 value={expenseName}
-                onChangeText={(v) => { setExpenseName(v); setError(null); }}
+                onChangeText={(v) => { setExpenseName(applyTextShortcuts(v)); setError(null); }}
                 placeholder="Expense name"
                 placeholderTextColor={C.textDim}
                 returnKeyType="next"
@@ -389,7 +400,12 @@ export default function ManualEntryScreen() {
                     selectionHaptic();
                     if (expCurrencyBtnRef.current) {
                       expCurrencyBtnRef.current.measureInWindow((x, y, w, h) => {
-                        setExpCurrencyDropPos({ top: y + h + 4, left: x, width: w });
+                        // This button is only 92px wide (just enough for "USD"), but the dropdown
+                        // rows show a symbol + code ("$ USD") — reusing the button's own width
+                        // wrapped every row onto two lines. Widen it, anchored to the button's
+                        // right edge so it doesn't run off-screen.
+                        const width = Math.max(w, 160);
+                        setExpCurrencyDropPos({ top: y + h + 4, left: Math.max(0, x + w - width), width });
                         setExpCurrencyOpen(true);
                       });
                     } else {
@@ -412,7 +428,7 @@ export default function ManualEntryScreen() {
                 key={code}
                 onPress={() => { selectionHaptic(); setExpenseCurrency(code); setExpCurrencyOpen(false); }}
                 divider={i > 0}
-                trailing={expenseCurrency === code ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+                trailing={expenseCurrency === code ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
               >
                 <Text style={s.detailText}>{getCurrencySymbol(code)} {code}</Text>
               </DropdownRow>
@@ -451,7 +467,7 @@ export default function ManualEntryScreen() {
           {tripPeople.length > 0 && (
             <>
               <FieldLabel style={{ marginTop: 20 }}>
-                {`FRIENDS${participants.length > 0 ? `  (${participants.length})` : ''}`}
+                {`RATS${participants.length > 0 ? `  (${participants.length})` : ''}`}
               </FieldLabel>
               <View style={s.chipsWrap}>
                 {tripPeople.map((name, i) => (
@@ -461,23 +477,22 @@ export default function ManualEntryScreen() {
             </>
           )}
 
-          {/* -- Who paid -- */}
-          {participants.length > 0 && (
+          {/* -- Who paid -- shows everyone on the trip, not just participants: someone can cover
+              an expense they didn't personally share in (e.g. paying for a group activity they
+              skipped), so the payer isn't restricted to the participant list. */}
+          {tripPeople.length > 0 && (
             <>
               <FieldLabel style={{ marginTop: 20 }}>WHO PAID?</FieldLabel>
               <View style={s.chipsWrap}>
-                {participants.map((name, i) => {
-                  const idx = tripPeople.indexOf(name);
-                  return (
-                    <PersonChip
-                      key={name}
-                      name={name}
-                      index={idx >= 0 ? idx : i}
-                      selected={paidByName === name}
-                      onPress={() => { selectionHaptic(); setPaidByName(name); }}
-                    />
-                  );
-                })}
+                {tripPeople.map((name, i) => (
+                  <PersonChip
+                    key={name}
+                    name={name}
+                    index={i}
+                    selected={paidByName === name}
+                    onPress={() => { selectionHaptic(); setPaidByName(name); }}
+                  />
+                ))}
               </View>
             </>
           )}
@@ -485,7 +500,7 @@ export default function ManualEntryScreen() {
           {tripPeople.length === 0 && (
             <View style={s.noParticipantsNote}>
               <MaterialCommunityIcons name="information-outline" size={14} color={C.textDim} />
-              <Text style={s.noParticipantsText}>Add friends to this trip to track who paid for each expense.</Text>
+              <Text style={s.noParticipantsText}>Add rats to this trip to track who paid for each expense.</Text>
             </View>
           )}
 
@@ -509,7 +524,7 @@ export default function ManualEntryScreen() {
 
           <View style={{ height: 16 }} />
         </ScrollView>
-        <LinearGradient colors={[`${C.bg}00`, C.bg]} pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }} />
+        <LinearGradient colors={[`${C.bg}00`, C.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28, pointerEvents: 'none' }} />
         </View>
 
         {error && <Text style={s.errorText}>{error}</Text>}
@@ -534,7 +549,7 @@ export default function ManualEntryScreen() {
             onPress={handleSave}
           />
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       <CategoryRenameModal cat={renamingCat} onClose={() => setRenamingCat(null)} />
 
@@ -546,12 +561,14 @@ export default function ManualEntryScreen() {
         scroll={false}
         style={{ paddingHorizontal: 14, paddingBottom: 6 }}
       >
-        <View style={s.catFilterRow}>
+        <View style={[s.catFilterRow, catFilterFocused && s.catFilterRowFocused]}>
           <SearchIcon color={C.text} size={14} />
           <TextInput
             style={[s.catFilterInput, { outlineWidth: 0, outlineStyle: 'none' } as any]}
             value={catFilter}
             onChangeText={setCatFilter}
+            onFocus={() => setCatFilterFocused(true)}
+            onBlur={() => setCatFilterFocused(false)}
             placeholder="Search or create…"
             placeholderTextColor={C.textDim}
             autoFocus
@@ -569,7 +586,7 @@ export default function ManualEntryScreen() {
             <PressBtn style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
               onPress={() => { setCategory(null); setCatOpen(false); setCatFilter(''); }} activeOpacity={0.7}>
               <Text style={[s.catOptionText, !category && { color: C.primary, fontFamily: 'Poppins_600SemiBold' }]}>None</Text>
-              {!category && <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" />}
+              {!category && <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} />}
             </PressBtn>
           </View>
           {filteredCats.map((cat) => (
@@ -577,7 +594,7 @@ export default function ManualEntryScreen() {
               <PressBtn style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
                 onPress={() => { selectionHaptic(); setCategory(cat); setCatOpen(false); setCatFilter(''); }} activeOpacity={0.7}>
                 <Text style={[s.catOptionText, category === cat && { color: C.primary, fontFamily: 'Poppins_600SemiBold' }]}>{cat}</Text>
-                {category === cat && <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" />}
+                {category === cat && <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} />}
               </PressBtn>
               <PressBtn onPress={() => { setCatOpen(false); setCatFilter(''); setRenamingCat(cat); }} hitSlop={10} activeOpacity={0.7}>
                 <PencilIcon color={C.textDim} size={14} />
@@ -589,7 +606,7 @@ export default function ManualEntryScreen() {
           ))}
           {catFilter.trim().length > 0 && !filteredCats.find((c) => c.toLowerCase() === catFilter.toLowerCase()) && (
             <PressBtn style={s.catCreateRow} onPress={handleCatSubmit} activeOpacity={0.7}>
-              <PlusCircleIcon color={C.primary} size={15} />
+              <PlusCircleIcon color={C.primary} size={15} strokeWidth={1.8} />
               <Text style={s.catCreateText}>Create "{catFilter.trim()}"</Text>
             </PressBtn>
           )}
@@ -610,13 +627,13 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: C.border, borderStyle: 'dashed', borderRadius: InputMetrics.radius,
     paddingVertical: 28, backgroundColor: C.card,
   },
-  receiptDropText: { fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.textSub },
+  receiptDropText: { ...Type.labelMedium, color: C.textSub },
   receiptThumb: { width: '100%', height: 160, borderRadius: 12, backgroundColor: C.card },
   receiptRemoveBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
     marginTop: 8, backgroundColor: C.error, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5,
   },
-  receiptRemoveText: { fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: C.white },
+  receiptRemoveText: { ...Type.pillLabel, color: C.white },
 
   separator: { height: 1, backgroundColor: C.border },
 
@@ -625,10 +642,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, height: InputMetrics.height,
   },
   detailInput: {
-    flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text, padding: 0,
+    flex: 1, minWidth: 0, ...Type.bodySmall, color: C.text, padding: 0,
   },
-  detailText: { fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text },
-  moneyPrefix: { fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.textSub },
+  detailText: { ...Type.bodySmall, color: C.text },
+  moneyPrefix: { ...Type.bodySmall, color: C.textSub },
   moneyCardBorder: { borderWidth: 1.5, borderColor: 'transparent' },
   moneyCardFocused: { borderColor: C.text },
 
@@ -637,16 +654,17 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border,
   },
+  catFilterRowFocused: { borderBottomColor: C.text },
   catFilterInput: {
-    flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text, padding: 0,
+    flex: 1, minWidth: 0, ...Type.bodySmall, color: C.text, padding: 0,
   },
   catOption: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border,
   },
-  catOptionText: { fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
+  catOptionText: { ...Type.labelMedium, color: C.text },
   catCreateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12 },
-  catCreateText: { fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.primary },
+  catCreateText: { ...Type.labelMedium, color: C.primary },
 
   // Dates inline row
   datesRow: { flexDirection: 'row', alignItems: 'stretch' },
@@ -664,7 +682,7 @@ const s = StyleSheet.create({
     marginTop: 10, padding: 12, borderRadius: 10,
     backgroundColor: C.primaryDim, borderWidth: 1, borderColor: C.primary + '30',
   },
-  perDayItem: { fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.text },
+  perDayItem: { ...Type.cardDesc, color: C.text },
   perDayVal: { fontFamily: 'Poppins_900Black', fontSize: 15, color: C.primary },
   perDayDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: C.textDim },
 
@@ -672,19 +690,19 @@ const s = StyleSheet.create({
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
   noParticipantsNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 16, paddingHorizontal: 4 },
-  noParticipantsText: { flex: 1, fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.textDim, lineHeight: 18 },
+  noParticipantsText: { flex: 1, ...Type.cardDesc, color: C.textDim, lineHeight: 18 },
 
   // Footer
-  errorText: { color: C.error, textAlign: 'center', fontSize: 13, fontFamily: 'Poppins_400Regular', paddingHorizontal: 16, paddingBottom: 4 },
+  errorText: { color: C.error, textAlign: 'center', ...Type.cardDesc, paddingHorizontal: 16, paddingBottom: 4 },
   footer: { padding: 16, paddingTop: 8, flexDirection: 'row', gap: 10 },
 
   // Category rename modal
-  modalTitle: { fontFamily: 'Poppins_700Bold', fontSize: 17, color: C.text },
+  modalTitle: { ...Type.cardTitle, color: C.text },
   catEditRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11, paddingHorizontal: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border },
-  catEditText: { fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text, flex: 1 },
-  catEditInput: { fontFamily: 'Poppins_400Regular', fontSize: 15 },
+  catEditText: { ...Type.bodySmall, color: C.text, flex: 1 },
+  catEditInput: { ...Type.bodySmall },
   newCatRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border },
-  newCatInput: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text, padding: 0 },
+  newCatInput: { flex: 1, ...Type.labelMedium, color: C.text, padding: 0 },
   newCatBtn: { width: 36, height: 36, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center' },
-  renameNote: { fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.textSub, lineHeight: 18 },
+  renameNote: { ...Type.cardDesc, color: C.textSub, lineHeight: 18 },
 });

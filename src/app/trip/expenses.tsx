@@ -5,7 +5,7 @@ import { BillTypeIcon, CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, Che
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { createElement, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActionSheetIOS, Alert, Dimensions, FlatList, Platform, Pressable, ScrollView, StyleSheet,
+  Dimensions, FlatList, Platform, Pressable, ScrollView, StyleSheet,
   TextInput, View,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -15,6 +15,7 @@ import { ActionPill } from '@/components/ActionPill';
 import { Avatar } from '@/components/Avatar';
 import { Button, Card, CenteredModal, CircleIconButton, Dropdown, DropdownRow, EditableTitle, IconBadge } from '@/components/design';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator';
@@ -22,6 +23,7 @@ import { getCategoryColorMap, getCategoryData } from '@/utils/categoryColors';
 import { fmtDate, fmtMonthYear } from '@/utils/date';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
+import { applyTextShortcuts } from '@/utils/text';
 import type { SplitRecord } from '@/types';
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -433,6 +435,7 @@ export default function TripExpensesScreen() {
 
   const quickAmount = parseFloat(quickAmountText) || 0;
   const canSaveQuick = quickName.trim().length > 0 && quickAmount > 0 && !!quickPayer;
+  const quickAddStarted = quickName.trim().length > 0 || quickAmountText.length > 0 || !!quickPayer;
 
   const openQuickPayerDropdown = () => {
     selectionHaptic();
@@ -500,7 +503,7 @@ export default function TripExpensesScreen() {
             key={opt.value || '__everyone'}
             onPress={() => { selectionHaptic(); setScopePerson(opt.value); setScopeDropOpen(false); }}
             divider={i > 0}
-            trailing={scopePerson === opt.value ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+            trailing={scopePerson === opt.value ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
           >
             <Text style={[s.scopeDropItemText, scopePerson === opt.value && { color: C.primary }]}>{opt.label}</Text>
           </DropdownRow>
@@ -598,7 +601,7 @@ export default function TripExpensesScreen() {
             <TextInput
               style={[s.quickAddNameInput, { outlineWidth: 0 } as any]}
               value={quickName}
-              onChangeText={setQuickName}
+              onChangeText={(v) => setQuickName(applyTextShortcuts(v))}
               onFocus={() => setQuickNameFocused(true)}
               onBlur={() => setQuickNameFocused(false)}
               placeholder="Quick add"
@@ -629,7 +632,7 @@ export default function TripExpensesScreen() {
             </Text>
           </PressBtn>
           <PressBtn onPress={handleQuickSave} disabled={!canSaveQuick} hitSlop={8} noShadow>
-            <CheckCircleIcon size={17} color={canSaveQuick ? C.text : C.textDim} filled={canSaveQuick} fillColor="#F7D76A" />
+            <CheckCircleIcon size={19} color={canSaveQuick ? C.text : C.textDim} filled={canSaveQuick} fillColor={C.yellow} />
           </PressBtn>
           <Dropdown visible={quickPayerDropOpen} position={quickPayerDropPos} onClose={() => setQuickPayerDropOpen(false)} style={{ minWidth: 150 }}>
             {tripPeople.map((name, i) => (
@@ -637,7 +640,7 @@ export default function TripExpensesScreen() {
                 key={name}
                 onPress={() => { selectionHaptic(); setQuickPayer(name); setQuickPayerDropOpen(false); }}
                 divider={i > 0}
-                trailing={quickPayer === name ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+                trailing={quickPayer === name ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
               >
                 <Text style={s.scopeDropItemText}>{name === myName ? `${name} (me)` : name}</Text>
               </DropdownRow>
@@ -652,32 +655,14 @@ export default function TripExpensesScreen() {
           size="big"
           label="Add"
           icon={<PlusIcon color={C.text} size={18} />}
-          onPress={() => {
-            mediumHaptic();
-            if (Platform.OS === 'ios') {
-              ActionSheetIOS.showActionSheetWithOptions(
-                { options: ['Cancel', 'Expense', 'Bill', 'Link Bill'], cancelButtonIndex: 0 },
-                (idx) => {
-                  if (idx === 1) { router.push({ pathname: '/trip/manual-entry' as any, params: { tripId: tripId!, direct: 'true' } }); }
-                  else if (idx === 2) { startTripEntry(tripId!); router.push('/upload'); }
-                  else if (idx === 3) { router.push({ pathname: '/trip/expense' as any, params: { tripId: tripId!, showImport: 'true' } }); }
-                },
-              );
-            } else if (Platform.OS === 'android') {
-              Alert.alert('Add', undefined, [
-                { text: 'Expense', onPress: () => { router.push({ pathname: '/trip/manual-entry' as any, params: { tripId: tripId!, direct: 'true' } }); } },
-                { text: 'Bill', onPress: () => { startTripEntry(tripId!); router.push('/upload'); } },
-                { text: 'Link Bill', onPress: () => { router.push({ pathname: '/trip/expense' as any, params: { tripId: tripId!, showImport: 'true' } }); } },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            } else {
-              setShowAddSheet(true);
-            }
-          }}
+          disabled={quickAddStarted}
+          onPress={() => { mediumHaptic(); setShowAddSheet(true); }}
         />
       </View>
 
-      {/* Web add sheet */}
+      {/* Add sheet — the app's own design, used on every platform. Native ActionSheetIOS/Alert
+          menus render in the OS's own chrome (dark, rounded, no icons/descriptions) rather than
+          the app's look, so this replaces them instead of only being a web-only fallback. */}
       <CenteredModal visible={showAddSheet} onClose={() => setShowAddSheet(false)} title={<Text style={s.sheetTitle}>Add to trip</Text>}>
         <View style={{ gap: 10 }}>
           {[
@@ -708,43 +693,43 @@ const s = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingBottom: 16 },
   emptyScreen: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyTitle: { fontFamily: 'Poppins_900Black', fontSize: 22, color: C.text },
+  emptyTitle: { ...Type.emptyTitle, color: C.text },
 
   scopeDrop: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
-  scopeDropText: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: C.text },
-  scopeDropItemText: { fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
+  scopeDropText: { ...Type.pillLabel, color: C.text },
+  scopeDropItemText: { ...Type.labelMedium, color: C.text },
 
   section: { paddingHorizontal: 16, paddingTop: 4 },
-  sectionLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 11, color: C.textSub, letterSpacing: 0.8, marginBottom: 10 },
+  sectionLabel: { ...Type.fieldLabel, color: C.textSub, marginBottom: 10 },
 
   // Expense cards
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   catBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, backgroundColor: C.primaryDim },
   catBadgeText: { fontFamily: 'Poppins_500Medium', fontSize: 10, color: C.primary },
-  feedTitle: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
-  feedTotal: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  feedTitle: { ...Type.cardTitle, color: C.text },
+  feedTotal: { ...Type.cardTitle, color: C.text },
 
   emptySection: { paddingVertical: 20, alignItems: 'center' },
-  emptySectionText: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textDim },
+  emptySectionText: { ...Type.cardDesc, color: C.textDim },
 
   // Footer
   footer: { padding: 16, paddingTop: 4 },
-  sheetTitle: { fontFamily: 'Poppins_900Black', fontSize: 22, color: C.text },
+  sheetTitle: { ...Type.h2, color: C.text },
   sheetOption: { gap: 14, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14 },
-  sheetOptionLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 16, color: C.text },
-  sheetOptionDesc: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: 2 },
+  sheetOptionLabel: { ...Type.button, color: C.text },
+  sheetOptionDesc: { ...Type.cardDesc, color: C.textSub, marginTop: 2 },
 
-  moneyPrefix: { fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.textSub },
+  moneyPrefix: { ...Type.bodySmall, color: C.textSub },
 
   // Day strip
   dayPickerRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginBottom: 12 },
   dayPickerDivider: { width: 1, backgroundColor: C.border, borderRadius: 1 },
   expHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 16, paddingTop: 14 },
-  monthNavLabel: { fontFamily: 'Poppins_700Bold', fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: C.text },
+  monthNavLabel: { ...Type.sectionLabel, letterSpacing: 0.6, textTransform: 'uppercase', color: C.text },
   dayStripAllWrap: { alignItems: 'center', justifyContent: 'center' },
   dayStripAllPill: { paddingHorizontal: 10, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   dayStripAllPillActive: { backgroundColor: C.tripBg },
-  dayStripAll: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: C.textSub },
+  dayStripAll: { ...Type.pillLabel, color: C.textSub },
   dayStripAllActive: { color: C.text, fontFamily: 'Poppins_700Bold' },
   dayBadgeWrap: { alignItems: 'center', gap: 1, width: 38 },
   dayBadgeWeekday: { fontFamily: 'Poppins_600SemiBold', fontSize: 9, color: C.textSub, letterSpacing: 0.2 },
@@ -754,22 +739,25 @@ const s = StyleSheet.create({
   dayBadgeCircleActive: { backgroundColor: C.tripBg },
   dayBadgeDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2, backgroundColor: 'transparent' },
   dayBadgeDotActive: { backgroundColor: C.text },
-  dayBadgeNum: { fontFamily: 'Poppins_700Bold', fontSize: 14, color: C.text },
-  dayBadgeNumActive: { fontFamily: 'Poppins_900Black' },
+  dayBadgeNum: { ...Type.cardTitle, color: C.text },
+  // Applied last in the style array so it always wins over dayBadgeNumOutTrip's dimmed gray — a
+  // selected day outside the trip's own date range was staying gray against its pink selected
+  // background instead of switching to black for contrast, since only font weight was set here.
+  dayBadgeNumActive: { fontFamily: 'Poppins_900Black', color: C.text },
   dayBadgeNumOutTrip: { color: C.textDim },
 
   quickAddRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     marginHorizontal: 16, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 8,
     backgroundColor: C.bg, borderRadius: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 6,
+    boxShadow: '0px 4px 12px rgba(0,0,0,0.12)', elevation: 6,
   },
   quickAddFieldActive: { borderColor: C.text },
   quickAddNameCard: { flex: 1, height: InputMetrics.height, justifyContent: 'center', borderWidth: 1.5, borderColor: C.border },
-  quickAddNameInput: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.text, paddingHorizontal: 12 },
+  quickAddNameInput: { ...Type.labelMedium, color: C.text, paddingHorizontal: 12 },
   quickAddAmountCard: { width: 66, height: InputMetrics.height, justifyContent: 'center', borderWidth: 1.5, borderColor: C.border },
   quickAddAmountInner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 2 },
-  quickAddAmountInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: C.text, padding: 0 },
+  quickAddAmountInput: { flex: 1, minWidth: 0, ...Type.pillLabel, color: C.text, padding: 0 },
   quickAddPayerBtn: {
     width: 62, height: InputMetrics.height, alignItems: 'center', justifyContent: 'center',
     borderRadius: InputMetrics.radius, backgroundColor: C.card, borderWidth: 1.5, borderColor: C.border,
@@ -779,14 +767,14 @@ const s = StyleSheet.create({
 
 const qst = StyleSheet.create({
   datePillWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.primaryDim, borderRadius: InputMetrics.radius, height: InputMetrics.height, paddingHorizontal: 12 },
-  datePillText: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.text },
-  sectionLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 11, color: C.textSub, letterSpacing: 0.8, marginTop: 2 },
+  datePillText: { ...Type.labelMedium, color: C.text },
+  sectionLabel: { ...Type.fieldLabel, color: C.textSub, marginTop: 2 },
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 12, backgroundColor: C.card },
-  personName: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
+  personName: { flex: 1, ...Type.labelMedium, color: C.text },
   personNamePaid: { color: C.textDim },
-  personAmt: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  personAmt: { ...Type.cardTitle, color: C.text },
   paidAmountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  paidAmountText: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.textSub, textDecorationLine: 'line-through' },
+  paidAmountText: { ...Type.cardTitle, color: C.textSub, textDecorationLine: 'line-through' },
   savedRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 18 },
   savedText: { fontFamily: 'Poppins_500Medium', fontSize: 12, color: C.success },
 });

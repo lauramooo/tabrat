@@ -7,8 +7,9 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { Button, Card, ConfirmModal, IconBadge } from '@/components/design';
-import { BillTypeIcon, CheckCircleIcon, CircleIcon, PencilIcon, PlusIcon, ProgressIcon, TrashIcon } from '@/components/FigmaIcons';
+import { BillTypeIcon, CheckCircleIcon, CircleIcon, EmptyStateIcon, PencilIcon, PlusIcon, ProgressIcon, TrashIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
 import { lightHaptic, mediumHaptic } from '@/utils/haptics';
 import { fmt } from '@/utils/calculator';
@@ -117,9 +118,9 @@ export default function TabsScreen() {
     <SafeAreaView style={s.safe} edges={['bottom']}>
       {sections.length === 0 ? (
         <View style={s.empty}>
-          <Text style={s.emptyEmoji}>??</Text>
+          <EmptyStateIcon size={52} />
           <Text style={s.emptyTitle}>No tabs yet</Text>
-          <Text style={s.emptyDesc}>Start a tab to split your first bill with friends.</Text>
+          <Text style={s.emptyDesc}>Start a tab to split your first bill with rats.</Text>
         </View>
       ) : (
         <SectionList
@@ -168,24 +169,24 @@ const s = StyleSheet.create({
   sectionSep: { height: 0 },
 
   sectionHeader: { paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg },
-  sectionLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 11, color: C.textSub, letterSpacing: 1, textTransform: 'uppercase' },
+  sectionLabel: { ...Type.fieldLabel, color: C.textSub, letterSpacing: 1, textTransform: 'uppercase' },
 
   tabRowClosed: { opacity: 0.5 },
-  tabTitle: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  tabTitle: { ...Type.cardTitle, color: C.text },
   closedTitle: { color: C.textDim },
-  tabDesc: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: -2 },
-  tabTotal: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  tabDesc: { ...Type.cardDesc, color: C.textSub, marginTop: -2 },
+  tabTotal: { ...Type.cardTitle, color: C.text },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   paidAmountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  paidAmountText: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.textSub, textDecorationLine: 'line-through' },
+  paidAmountText: { ...Type.cardTitle, color: C.textSub, textDecorationLine: 'line-through' },
   payLine: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  payLineText: { fontFamily: 'Poppins_400Regular', fontSize: 11, color: C.textDim },
+  payLineText: { ...Type.cardDesc, color: C.textDim },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
   emptyEmoji: { fontSize: 52 },
-  emptyTitle: { fontFamily: 'Poppins_900Black', fontSize: 26, color: C.text },
-  emptyDesc: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textSub, textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { ...Type.emptyTitle, color: C.text },
+  emptyDesc: { ...Type.cardDesc, color: C.textSub, textAlign: 'center', lineHeight: 22 },
 
   footer: { padding: 16, paddingTop: 8 },
 });

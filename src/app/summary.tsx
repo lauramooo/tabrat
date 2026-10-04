@@ -13,26 +13,55 @@ import { captureRef } from 'react-native-view-shot';
 import { BillHeader, FlowSteps } from '@/components/FlowSteps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
 import { calculateSplits, fmt } from '@/utils/calculator';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { fmtDate } from '@/utils/date';
 import { lightHaptic, mediumHaptic, successHaptic } from '@/utils/haptics';
+import { shareText } from '@/utils/share';
 import type { Person, PersonSplit } from '@/types';
 
 const PERSON_COLORS = AVATAR_PALETTE;
 
+// -- Receipt torn-edge decoration -----------------------------------------------
+
+const TOOTH_HEIGHT = 9;
+const SHARE_CARD_WIDTH = 360;
+
+// A row of white triangular "teeth" tapering to points away from the card, so the cream page
+// shows through the gaps between them — reads as the card's own edge being torn rather than a
+// separate shape sitting on it. Pre-baked as a fully OPAQUE 360x9 PNG (cream baked directly into
+// the "notch" pixels, not left transparent) rather than drawn at runtime with SVG/border tricks:
+// react-native-view-shot's web capture silently drops border-triangle Views, react-native-svg
+// content, AND transparent-PNG <Image>s alike when rasterizing — plain opaque pixels are the one
+// thing that survives that capture reliably (confirmed by testing a flat opaque-color View, which
+// captures fine), so this trades a hardcoded background color for something that actually renders.
+const ZIGZAG_TOP_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAWgAAAAJCAYAAAAfOraeAAAAgElEQVR42u3UMQqAMAwF0Nz/pK5ubjo5ljY2BaHvw9/Ka7IkrvO4VVX1f43M4zerhuHz+Xx+8kC3Uj04n8/n8xMHupdVw/P5fP7ufszgs0vw+Xw+P3mgv6Z6cD6fz9/Zjyp8dAk+n8/nj/lRifeW4PP5fP64H5Vw6yM+n8/n5/0HmQE64J5lKxgAAAAASUVORK5CYII=';
+const ZIGZAG_BOTTOM_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAWgAAAAJCAYAAAAfOraeAAAAg0lEQVR42u3UMQqAQAwEwPz/pbZ2doqFIMLpeYlgMQtpZ7dKrCIi8svEMk+f4bvN5/P5/DE/jpLKorPJ5/P5/DE/qkta4/l8Pp//zo/KkqfxfD6fz+/3o6Kodzifz+fz+/3IloyO5/P5fP6Ue9B3JdnxfD6fz08+6GtR1XA+n8/nt28DQqJ4wLG9tb0AAAAASUVORK5CYII=';
+
+function ReceiptZigzagEdge({ flip = false }: { flip?: boolean }) {
+  return (
+    <Image
+      source={{ uri: flip ? ZIGZAG_BOTTOM_URI : ZIGZAG_TOP_URI }}
+      style={{ width: SHARE_CARD_WIDTH, height: TOOTH_HEIGHT }}
+      resizeMode="stretch"
+    />
+  );
+}
+
 // -- Share image modal ---------------------------------------------------------
 
-function ShareCardContent({ splits, total, restaurantName, date, mode, colorOffset = 0 }: {
-  splits: PersonSplit[]; total: number; restaurantName?: string; date?: string; mode: 'short' | 'full'; colorOffset?: number;
+function ShareCardContent({ splits, total, restaurantName, date, mode, colorOffset = 0, joinCode }: {
+  splits: PersonSplit[]; total: number; restaurantName?: string; date?: string; mode: 'short' | 'full'; colorOffset?: number; joinCode?: string;
 }) {
   return (
     <>
-      {!!restaurantName && (
+      {(!!restaurantName || !!joinCode) && (
         <View style={{ alignItems: 'center', marginBottom: 4 }}>
-          <Text style={st.shareCardTitle}>{restaurantName}</Text>
+          {!!restaurantName && <Text style={st.shareCardTitle}>{restaurantName}</Text>}
           {!!date && <Text style={st.shareCardDate}>{fmtDate(date) || date}</Text>}
+          {!!joinCode && <Text style={st.shareCardCode}>Tab Rat share code: {joinCode}</Text>}
         </View>
       )}
       {splits.map((s, i) => (
@@ -45,14 +74,19 @@ function ShareCardContent({ splits, total, restaurantName, date, mode, colorOffs
           {mode === 'full' && s.itemShares.length > 0 && (
             <View style={st.shareItems}>
               {s.itemShares.map(({ item, share }) => (
-                <View key={item.id} style={st.lineRow}>
-                  <Text style={st.lineName} numberOfLines={1}>{item.name}</Text>
-                  {item.assignedTo.length > 1 && (
-                    <View style={st.lineSplitBadge}>
-                      <Text style={st.lineSplitText}>÷{item.assignedTo.length}</Text>
-                    </View>
+                <View key={item.id}>
+                  <View style={st.lineRow}>
+                    <Text style={st.lineName} numberOfLines={1}>{item.name}</Text>
+                    {item.assignedTo.length > 1 && (
+                      <View style={st.lineSplitBadge}>
+                        <Text style={st.lineSplitText}>÷{item.assignedTo.length}</Text>
+                      </View>
+                    )}
+                    <Text style={st.lineAmt}>{fmt(share)}</Text>
+                  </View>
+                  {!!item.modifiers?.length && (
+                    <Text style={st.lineModifiers} numberOfLines={1}>{item.modifiers.join(', ')}</Text>
                   )}
-                  <Text style={st.lineAmt}>{fmt(share)}</Text>
                 </View>
               ))}
               <Divider style={st.divider} />
@@ -90,12 +124,13 @@ function ShareCardContent({ splits, total, restaurantName, date, mode, colorOffs
   );
 }
 
-function ShareImageModal({ splits, total, restaurantName, date, colorOffset, onClose }: {
+function ShareImageModal({ splits, total, restaurantName, date, colorOffset, joinCode, onClose }: {
   splits: PersonSplit[];
   total: number;
   restaurantName?: string;
   date?: string;
   colorOffset?: number;
+  joinCode?: string;
   onClose: () => void;
 }) {
   const isSinglePerson = splits.length === 1;
@@ -103,18 +138,31 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, onC
   const cardRef = useRef<View>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [imgRatio, setImgRatio] = useState(1.4);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const capture = async () => {
     setPreviewUri(null);
     await new Promise((r) => setTimeout(r, 200));
     try {
       const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
-      Image.getSize(uri, (w, h) => { if (w && h) setImgRatio(w / h); });
+      Image.getSize(uri, (w, h) => { if (w && h) setImgRatio(w / h); }, (e) => console.log('[summary] getSize failed:', e));
       setPreviewUri(uri);
-    } catch {}
+    } catch (e) {
+      console.log('[summary] captureRef failed:', e);
+    }
   };
 
   useEffect(() => { capture(); }, [mode]);
+
+  const handleShareCode = async () => {
+    if (!joinCode) return;
+    mediumHaptic();
+    const didCopy = await shareText(`Join my bill split on Tab Rat! Code: ${joinCode}`);
+    if (didCopy) {
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    }
+  };
 
   const doShare = async () => {
     mediumHaptic();
@@ -137,9 +185,13 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, onC
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       {/* Off-screen capture target */}
-      <View style={{ position: 'absolute', left: -9999, top: 0, width: 360 }}>
-        <View ref={cardRef} style={[st.shareCard, { borderRadius: 0 }]} collapsable={false}>
-          <ShareCardContent splits={splits} total={total} restaurantName={restaurantName} date={date} mode={mode} colorOffset={colorOffset} />
+      <View style={{ position: 'absolute', left: -9999, top: 0, width: 360, backgroundColor: C.bg }}>
+        <View ref={cardRef} collapsable={false}>
+          <ReceiptZigzagEdge />
+          <View style={[st.shareCard, { borderRadius: 0 }]}>
+            <ShareCardContent splits={splits} total={total} restaurantName={restaurantName} date={date} mode={mode} colorOffset={colorOffset} joinCode={joinCode} />
+          </View>
+          <ReceiptZigzagEdge flip />
         </View>
       </View>
 
@@ -157,8 +209,12 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, onC
             </View>
           )}
 
-          {/* Scrollable image preview — right-click on web copies the image */}
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+          {/* Scrollable image preview — right-click on web copies the image. minHeight (not just
+              flex:1) matters here: modalCard sizes itself to its content up to maxHeight rather
+              than always filling it, so a flex:1 child with nothing stretching its parent to a
+              definite height collapses toward zero and neither the image nor the placeholder text
+              below was ever visible. */}
+          <ScrollView style={{ flex: 1, minHeight: 280 }} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
             {previewUri ? (
               <Image
                 source={{ uri: previewUri }}
@@ -171,6 +227,14 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, onC
               </View>
             )}
           </ScrollView>
+
+          {!!joinCode && (
+            <PressBtn style={st.imgModalCodeRow} onPress={handleShareCode} activeOpacity={0.7}>
+              <Text style={st.codeRowLabel}>CODE</Text>
+              <Text style={st.codeRowValue}>{joinCode}</Text>
+              <Text style={st.codeRowAction}>{codeCopied ? 'Copied!' : 'Share'}</Text>
+            </PressBtn>
+          )}
 
           <Button
             variant="primary"
@@ -289,14 +353,19 @@ function PersonDetailModal({ split, index, payer, paid, isPayer, onClose, onMark
     >
       <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
         {split.itemShares.map(({ item, share }) => (
-          <View key={item.id} style={st.lineRow}>
-            <Text style={st.lineName} numberOfLines={1}>{item.name}</Text>
-            {item.assignedTo.length > 1 && (
-              <View style={st.lineSplitBadge}>
-                <Text style={st.lineSplitText}>÷{item.assignedTo.length}</Text>
-              </View>
+          <View key={item.id}>
+            <View style={st.lineRow}>
+              <Text style={st.lineName} numberOfLines={1}>{item.name}</Text>
+              {item.assignedTo.length > 1 && (
+                <View style={st.lineSplitBadge}>
+                  <Text style={st.lineSplitText}>÷{item.assignedTo.length}</Text>
+                </View>
+              )}
+              <Text style={st.lineAmt}>{fmt(share)}</Text>
+            </View>
+            {!!item.modifiers?.length && (
+              <Text style={st.lineModifiers} numberOfLines={1}>{item.modifiers.join(', ')}</Text>
             )}
-            <Text style={st.lineAmt}>{fmt(share)}</Text>
           </View>
         ))}
       </ScrollView>
@@ -347,6 +416,7 @@ export default function SummaryScreen() {
   const savedRef = useRef(false);
   const [snackVisible, setSnackVisible] = useState(false);
   const [shareImageVisible, setShareImageVisible] = useState(false);
+  const joinCode = savedSplitId ? history.find((r) => r.id === savedSplitId)?.joinCode : undefined;
   const [sharePerson, setSharePerson] = useState<{ split: PersonSplit; colorIdx: number } | null>(null);
   const [detailPerson, setDetailPerson] = useState<{ split: PersonSplit; colorIdx: number } | null>(null);
   const payerBtnRef = useRef<PressBtn>(null);
@@ -426,11 +496,12 @@ export default function SummaryScreen() {
             : <ChevronDownCircleIcon color={C.text} size={15} />}
         </PressBtn>
       </View>
+
       <Dropdown visible={payerDropOpen} position={payerDropPos} onClose={() => setPayerDropOpen(false)} style={{ minWidth: 180 }}>
         <DropdownRow
           onPress={() => { lightHaptic(); setPaidBy(null); setPayerDropOpen(false); }}
           divider={false}
-          trailing={!paidBy ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+          trailing={!paidBy ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
         >
           <Text style={[st.payerDropItemText, !paidBy && { color: C.primary }]}>No payer</Text>
         </DropdownRow>
@@ -439,7 +510,7 @@ export default function SummaryScreen() {
             key={person.id}
             onPress={() => { lightHaptic(); setPaidBy(person.id); setPayerDropOpen(false); }}
             divider
-            trailing={paidBy === person.id ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+            trailing={paidBy === person.id ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
           >
             <Text style={[st.payerDropItemText, paidBy === person.id && { color: C.primary }]}>{person.name}</Text>
           </DropdownRow>
@@ -477,6 +548,7 @@ export default function SummaryScreen() {
           total={total}
           restaurantName={restaurantName ?? undefined}
           date={receiptDate ?? undefined}
+          joinCode={joinCode}
           onClose={() => setShareImageVisible(false)}
         />
       )}
@@ -487,6 +559,7 @@ export default function SummaryScreen() {
           restaurantName={restaurantName ?? undefined}
           date={receiptDate ?? undefined}
           colorOffset={sharePerson.colorIdx}
+          joinCode={joinCode}
           onClose={() => setSharePerson(null)}
         />
       )}
@@ -525,33 +598,35 @@ export default function SummaryScreen() {
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   totalBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
-  totalLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 11, color: C.textSub, letterSpacing: 0.8 },
-  totalAmt: { fontFamily: 'Poppins_900Black', fontSize: 26, color: C.text, lineHeight: 30 },
+  totalLabel: { ...Type.fieldLabel, color: C.textSub },
+  totalAmt: { ...Type.h2, color: C.text, lineHeight: 30 },
   payerDrop: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: C.card },
-  payerDropText: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: C.text },
-  payerDropItemText: { fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
+  payerDropText: { ...Type.pillLabel, color: C.text },
+  payerDropItemText: { ...Type.labelMedium, color: C.text },
+
 
   scroll: { flex: 1 },
   content: { padding: 16, gap: 10, paddingBottom: 16 },
 
   feedCardClosed: { opacity: 0.5 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  feedTitle: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  feedTitle: { ...Type.cardTitle, color: C.text },
   closedTitle: { color: C.textDim },
-  feedDesc: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: -2 },
-  feedTotal: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  feedDesc: { ...Type.cardDesc, color: C.textSub, marginTop: -2 },
+  feedTotal: { ...Type.cardTitle, color: C.text },
   paidAmountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  paidAmountText: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.textSub, textDecorationLine: 'line-through' },
+  paidAmountText: { ...Type.cardTitle, color: C.textSub, textDecorationLine: 'line-through' },
 
   divider: { backgroundColor: C.border, marginVertical: 8 },
   lineRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
-  lineName: { flex: 1, color: C.text, fontFamily: 'Poppins_400Regular', fontSize: 13 },
+  lineName: { flex: 1, color: C.text, ...Type.cardDesc },
   lineSplitBadge: { backgroundColor: C.border, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, flexShrink: 0 },
   lineSplitText: { color: C.textSub, fontFamily: 'Poppins_500Medium', fontSize: 11 },
-  lineAmt: { color: C.text, fontFamily: 'Poppins_600SemiBold', fontSize: 13 },
+  lineAmt: { color: C.text, ...Type.pillLabel },
+  lineModifiers: { color: C.textDim, ...Type.caption, marginLeft: 8, marginTop: -2, marginBottom: 2 },
   expandActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
   taxTipRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  taxTipLabel: { flex: 1, color: C.textDim, fontFamily: 'Poppins_400Regular', fontSize: 12 },
+  taxTipLabel: { flex: 1, color: C.textDim, ...Type.cardDesc },
 
 
   footer: { padding: 16, paddingTop: 8, gap: 8 },
@@ -560,21 +635,26 @@ const st = StyleSheet.create({
   // Modal shell (also used by ShareImageModal)
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 32 },
   modalCard: { backgroundColor: C.bg, borderRadius: 20, padding: 24, width: '100%', gap: 12 },
-  modalTitle: { fontFamily: 'Poppins_900Black', fontSize: 22, color: C.text, lineHeight: 26 },
-  modalPersonName: { fontFamily: 'Poppins_700Bold', fontSize: 16, color: C.text },
-  modalPersonSub: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: 1 },
+  modalTitle: { ...Type.h2, color: C.text, lineHeight: 26 },
+  modalPersonName: { ...Type.cardTitle, color: C.text },
+  modalPersonSub: { ...Type.cardDesc, color: C.textSub, marginTop: 1 },
   modalTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
-  modalTotalLabel: { fontFamily: 'Poppins_700Bold', fontSize: 14, color: C.text },
+  modalTotalLabel: { ...Type.cardTitle, color: C.text },
   modalTotalAmt: { fontFamily: 'Poppins_900Black', fontSize: 18, color: C.text },
 
   // Share image modal
   modeToggle: { flexDirection: 'row', gap: 8 },
+  imgModalCodeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.card, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
+  codeRowLabel: { ...Type.fieldLabel, color: C.textDim },
+  codeRowValue: { flex: 1, ...Type.cardTitle, color: C.text, letterSpacing: 1 },
+  codeRowAction: { ...Type.pillLabel, color: C.primary },
 
   shareCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20, gap: 10 },
   shareCardTitle: { fontFamily: 'Poppins_900Black', fontSize: 20, color: '#1a1a1a', textAlign: 'center' },
-  shareCardDate: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: 2 },
+  shareCardDate: { ...Type.cardDesc, color: C.textSub, marginTop: 2 },
+  shareCardCode: { ...Type.fieldLabel, color: C.textSub, marginTop: 4, letterSpacing: 0.3 },
   shareRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sharePersonName: { flex: 1, fontFamily: 'Poppins_600SemiBold', fontSize: 15, color: '#1a1a1a' },
+  sharePersonName: { flex: 1, ...Type.pillLabel, color: '#1a1a1a' },
   sharePersonTotal: { fontFamily: 'Poppins_900Black', fontSize: 18, color: '#1a1a1a' },
   shareItems: { gap: 2, marginTop: 4 },
   shareSep: { height: 1, backgroundColor: '#eee', marginVertical: 8 },

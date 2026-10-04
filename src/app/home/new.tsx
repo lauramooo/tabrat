@@ -1,16 +1,17 @@
 import { PressBtn } from '@/components/PressBtn';
-import { ChevronDownCircleIcon, ChevronUpCircleIcon, HomeTypeIcon, PlusCircleIcon, SearchIcon, UserIcon } from '@/components/FigmaIcons';
+import { ChevronDownCircleIcon, ChevronUpCircleIcon, HomeTypeIcon, PlusCircleIcon, UserIcon } from '@/components/FigmaIcons';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import {
   Platform, ScrollView, StyleSheet,
-  TextInput, View,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
-import { Button, Card, Dropdown, DropdownRow, FieldLabel, Input } from '@/components/design';
+import { Button, Dropdown, DropdownRow, FieldLabel, Input, SearchInput } from '@/components/design';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
@@ -26,6 +27,7 @@ export default function NewHomeScreen() {
   const [myName, setMyName] = useState('');
   const [friendSearch, setFriendSearch] = useState('');
   const [friendDropOpen, setFriendDropOpen] = useState(false);
+  const [addPressed, setAddPressed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,8 +87,13 @@ export default function NewHomeScreen() {
         headerTitleAlign: 'center',
         headerTransparent: false,
         headerStyle: { backgroundColor: C.bg },
-        headerTitleStyle: { fontFamily: 'Poppins_900Black', fontSize: 22, color: C.text },
+        headerTitleStyle: { ...Type.h2, color: C.text },
       }} />
+      {/* No KeyboardAvoidingView — it fights the ScrollView's own native "scroll the focused
+          field into view" behavior on iOS and can collapse the whole scroll area to almost
+          nothing when the keyboard opens (see manual-entry.tsx and AuthGate.tsx for the same
+          failure mode and fix). */}
+      <View style={{ flex: 1 }}>
       <ScrollView
         contentContainerStyle={s.content}
         keyboardShouldPersistTaps="handled"
@@ -125,33 +132,32 @@ export default function NewHomeScreen() {
         )}
 
         <View style={{ position: 'relative', zIndex: showDrop ? 20 : 0, marginBottom: 12 }}>
-          <Card padding={0} row={false} style={s.friendsCard}>
-            <View style={s.friendSearchRow}>
-              <SearchIcon color={C.text} size={15} />
-              <TextInput
-                style={[s.friendSearchInput, { outlineWidth: 0 } as any]}
-                value={friendSearch}
-                onChangeText={setFriendSearch}
-                onFocus={() => setFriendDropOpen(true)}
-                onBlur={() => setTimeout(() => setFriendDropOpen(false), 150)}
-                placeholder="Search friends or groups"
-                placeholderTextColor={C.textDim}
-                onSubmitEditing={() => addMember()}
-                returnKeyType="done"
-              />
-              {friendSearch.trim() ? (
-                <PressBtn onPress={() => addMember()} hitSlop={8} activeOpacity={0.7}>
-                  <PlusCircleIcon color={C.primary} size={15} />
-                </PressBtn>
-              ) : (
-                <PressBtn onPress={() => setFriendDropOpen((o) => !o)} hitSlop={8} activeOpacity={0.7}>
-                  {friendDropOpen
-                    ? <ChevronUpCircleIcon color={C.text} size={15} />
-                    : <ChevronDownCircleIcon color={C.text} size={15} />}
-                </PressBtn>
-              )}
-            </View>
-          </Card>
+          <SearchInput
+            value={friendSearch}
+            onChangeText={setFriendSearch}
+            onFocus={() => setFriendDropOpen(true)}
+            onBlur={() => setTimeout(() => setFriendDropOpen(false), 150)}
+            placeholder="Search rats or groups"
+            onSubmitEditing={() => addMember()}
+            returnKeyType="done"
+            trailing={friendSearch.trim() ? (
+              <PressBtn
+                onPress={() => addMember()}
+                onPressIn={() => setAddPressed(true)}
+                onPressOut={() => setAddPressed(false)}
+                hitSlop={8}
+                activeOpacity={0.7}
+              >
+                <PlusCircleIcon color={C.primary} size={15} strokeWidth={1.8} filled={addPressed} />
+              </PressBtn>
+            ) : (
+              <PressBtn onPress={() => setFriendDropOpen((o) => !o)} hitSlop={8} activeOpacity={0.7}>
+                {friendDropOpen
+                  ? <ChevronUpCircleIcon color={C.text} size={15} />
+                  : <ChevronDownCircleIcon color={C.text} size={15} />}
+              </PressBtn>
+            )}
+          />
           <Dropdown mode="inline" visible={showDrop} position={{ top: InputMetrics.height + 4 }} onClose={() => setFriendDropOpen(false)}>
             {filteredFriends.map((f) => (
               <DropdownRow key={f.id} icon={<UserIcon size={15} color={C.textSub} />} onPress={() => addMember(f.name)}>
@@ -183,6 +189,7 @@ export default function NewHomeScreen() {
           onPress={handleCreate}
         />
       </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -195,13 +202,10 @@ const s = StyleSheet.create({
 
   peopleChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
 
-  friendsCard: { overflow: 'hidden' },
-  friendSearchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: InputMetrics.height, gap: 10 },
-  friendSearchInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text },
-  friendDropName: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
-  friendDropSub: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textDim },
+  friendDropName: { flex: 1, ...Type.labelMedium, color: C.text },
+  friendDropSub: { ...Type.cardDesc, color: C.textDim },
 
-  errorText: { color: C.error, fontSize: 13, fontFamily: 'Poppins_400Regular', marginTop: 8 },
+  errorText: { color: C.error, ...Type.cardDesc, marginTop: 8 },
 
   footer: { paddingHorizontal: 16, paddingBottom: 8, paddingTop: 8 },
 });

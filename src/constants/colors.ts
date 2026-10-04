@@ -1,5 +1,5 @@
-const BACKGROUND = '#F8F1E8';
-const LAYER = '#EDE6DD';
+const BACKGROUND = '#FFFBEF';
+const LAYER = '#F5F1E5';
 
 export const C = {
   bg: BACKGROUND,
@@ -7,13 +7,15 @@ export const C = {
   border: '#E8E4DC',
   primary: '#000000',
   primaryDim: LAYER,
-  yellow: LAYER,
+  yellow: '#F7D76A',
+  yellowPressed: '#E7C94D',
   text: '#000000',
   textSub: '#606060',
   textDim: '#9A9A9A',
   success: '#57613B',
   successBg: '#B9C886',
   error: '#F2786B',
+  errorPressed: '#DE6354',
   errorFg: '#6D2A23',
   white: '#FFFFFF',
   billBg: '#B9C886',

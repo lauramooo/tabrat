@@ -1,4 +1,5 @@
 import type { Person, PersonSplit, ReceiptItem } from '@/types';
+import { CURRENCIES } from '@/constants/currencies';
 
 export function calculateSplits(
   items: ReceiptItem[],
@@ -43,11 +44,13 @@ export function calculateSplits(
   });
 }
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: '$', EUR: '€', GBP: '£', JPY: '¥', CAD: 'CA$', AUD: 'A$',
-  CHF: 'Fr', CNY: '¥', MXN: 'MX$', SGD: 'S$', HKD: 'HK$', INR: '₹',
-  BRL: 'R$', KRW: '₩', AED: 'AED',
-};
+// Derived from the shared currency list (src/constants/currencies.ts) rather than a separate
+// hardcoded map — previously this had its own drifted-out-of-sync copy of symbols that was
+// missing most of the currencies selectable elsewhere in the app, so picking one of those showed
+// its raw ISO code (e.g. "ARS37.62") instead of a symbol everywhere money gets formatted.
+const CURRENCY_SYMBOLS: Record<string, string> = Object.fromEntries(
+  CURRENCIES.map((c) => [c.code, c.symbol]),
+);
 
 export function getCurrencySymbol(code: string): string {
   return CURRENCY_SYMBOLS[code] ?? code;

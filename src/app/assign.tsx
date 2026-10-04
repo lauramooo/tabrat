@@ -10,6 +10,7 @@ import { BillHeader, FlowSteps } from '@/components/FlowSteps';
 import { ChevronDownCircleIcon, ChevronUpCircleIcon, ScissorIcon } from '@/components/FigmaIcons';
 import { PersonChip } from '@/components/PersonChip';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { fmt } from '@/utils/calculator';
@@ -29,7 +30,7 @@ export default function AssignScreen() {
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
 
-  // Local expand state � subAssigns[itemId][unitIdx] = personId[]
+  // Local expand state — subAssigns[itemId][unitIdx] = personId[]
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [subAssigns, setSubAssigns] = useState<Record<string, string[][]>>({});
 
@@ -80,7 +81,7 @@ export default function AssignScreen() {
     ? items
     : items.filter((i) => (i.category ?? 'Other') === activeCategory);
 
-  // Progress � expanded items count as assigned only if all sub-units are assigned
+  // Progress — expanded items count as assigned only if all sub-units are assigned
   const assignedCount = items.filter((i) => {
     if (expanded.has(i.id) && i.quantity > 1) {
       const subs = subAssigns[i.id];
@@ -135,7 +136,7 @@ export default function AssignScreen() {
           <Text variant="labelMedium" style={styles.progressLabel}>{assignedCount} of {items.length} assigned</Text>
           <Text variant="labelMedium" style={styles.progressPct}>{Math.round(progress * 100)}%</Text>
         </View>
-        <ProgressBar progress={progress} color="#F7D76A" style={styles.progressBar} />
+        <ProgressBar progress={progress} color={C.yellow} style={styles.progressBar} />
       </View>
 
       {/* Category filter */}
@@ -166,10 +167,20 @@ export default function AssignScreen() {
             <Card key={item.id} padding={11} radius={10} row={false} style={styles.card}>
               {/* Card header */}
               <View style={styles.cardHeader}>
-                <Text variant="titleMedium" style={styles.itemName} numberOfLines={2}>
-                  {item.name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}
-                </Text>
-                <Text variant="titleMedium" style={styles.itemPrice}>{fmt(item.price)}</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                    {item.quantity > 1 && (
+                      <View style={styles.qtyChip}>
+                        <Text style={styles.qtyChipText}>×{item.quantity}</Text>
+                      </View>
+                    )}
+                  </View>
+                  {!!item.modifiers?.length && (
+                    <Text style={styles.itemModifiers} numberOfLines={2}>{item.modifiers.join(', ')}</Text>
+                  )}
+                </View>
+                <Text style={styles.itemPrice}>{fmt(item.price)}</Text>
                 {item.quantity > 1 && (
                   <PressBtn
                     onPress={() => toggleExpand(item.id, item.quantity)}
@@ -283,23 +294,27 @@ const styles = StyleSheet.create({
   catRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 10, alignItems: 'center' },
   catChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: C.card, borderWidth: 1.5, borderColor: C.border },
   catChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  catChipText: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.textSub },
+  catChipText: { ...Type.labelMedium, color: C.textSub },
   catChipTextActive: { color: '#fff', fontFamily: 'Poppins_600SemiBold' },
 
   scroll: { flex: 1 },
   content: { padding: 12, gap: 8, paddingBottom: 8 },
   card: { gap: 10 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  itemName: { flex: 1, color: C.text },
-  itemPrice: { color: C.text, fontWeight: '700' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  itemName: { color: C.text, ...Type.cardTitle },
+  itemModifiers: { color: C.textDim, ...Type.caption, marginTop: 2 },
+  itemPrice: { color: C.text, ...Type.cardTitle },
+  qtyChip: { backgroundColor: C.tripBg, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, flexShrink: 0 },
+  qtyChipText: { color: C.tripFg, ...Type.pillLabel },
   expandBtn: { paddingLeft: 4, paddingTop: 2 },
 
   chipsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   chips: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chipSep: { width: 1, alignSelf: 'stretch', backgroundColor: 'rgba(0,0,0,0.12)', marginHorizontal: 2 },
   allBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1.5, borderColor: 'transparent', backgroundColor: 'transparent' },
-  allBtnActive: { backgroundColor: '#F7D76A', borderColor: '#1A1A1A' },
-  allBtnText: { fontSize: 12, fontFamily: 'Poppins_600SemiBold', color: C.textSub },
+  allBtnActive: { backgroundColor: C.yellow, borderColor: '#1A1A1A' },
+  allBtnText: { ...Type.pillLabel, color: C.textSub },
   allBtnTextActive: { color: C.text },
   splitNote: { color: C.textSub },
 
@@ -311,10 +326,10 @@ const styles = StyleSheet.create({
     paddingTop: 10, paddingBottom: 4,
   },
   subRowFirst: { marginTop: -4 },
-  subRowNum: { fontFamily: 'Poppins_700Bold', fontSize: 11, color: C.textDim, width: 14, textAlign: 'center' },
+  subRowNum: { ...Type.cardTitle, color: C.textDim, width: 14, textAlign: 'center' },
   subRowPrice: { fontFamily: 'Poppins_500Medium', fontSize: 11, color: C.textSub, minWidth: 36 },
   subChips: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 
   footer: { padding: 16, paddingTop: 8 },
-  errorText: { color: C.error, fontSize: 13, fontFamily: 'Poppins_400Regular', textAlign: 'center' },
+  errorText: { color: C.error, ...Type.cardDesc, textAlign: 'center' },
 });

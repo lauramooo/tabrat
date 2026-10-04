@@ -1,16 +1,17 @@
 import { PressBtn } from '@/components/PressBtn';
-import { CheckCircleIcon, CloseCircleIcon, HomeTypeIcon, PlusIcon, ReopenIcon, SearchIcon, TrashIcon } from '@/components/FigmaIcons';
-import { Button, Card, ConfirmModal, IconBadge, SectionLabel } from '@/components/design';
+import { CheckCircleIcon, CloseCircleIcon, EmptyStateIcon, HomeTypeIcon, PlusIcon, ReopenIcon, TrashIcon } from '@/components/FigmaIcons';
+import { Button, Card, ConfirmModal, IconBadge, SearchInput, SectionLabel } from '@/components/design';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
   Animated, ScrollView, StyleSheet,
-  TextInput, View,
+  View,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { fmt } from '@/utils/calculator';
@@ -126,29 +127,24 @@ export default function HomesScreen() {
         </View>
       </View>
       <View style={s.searchRow}>
-        <View style={s.searchBox}>
-          <SearchIcon color={C.text} size={16} style={{ marginLeft: 14 }} />
-          <TextInput
-            style={s.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search"
-            placeholderTextColor={C.textDim}
-          />
-          {searchQuery.length > 0 && (
-            <PressBtn onPress={() => setSearchQuery('')} hitSlop={8} style={{ paddingHorizontal: 14 }}>
+        <SearchInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search"
+          trailing={searchQuery.length > 0 && (
+            <PressBtn onPress={() => setSearchQuery('')} hitSlop={8} style={{ paddingHorizontal: 6 }}>
               <CloseCircleIcon size={15} color={C.textDim} />
             </PressBtn>
           )}
-        </View>
+        />
       </View>
 
       <ScrollView ref={scrollRef} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         {homes.length === 0 ? (
           <View style={s.empty}>
-            <Text style={{ fontSize: 52 }}>??</Text>
+            <EmptyStateIcon size={52} />
             <Text style={s.emptyTitle}>No homes yet</Text>
-            <Text style={s.emptyBody}>Track shared expenses with roommates or a partner � rent, utilities, groceries, and more.</Text>
+            <Text style={s.emptyBody}>Track shared expenses with roommates or a partner — rent, utilities, groceries, and more.</Text>
           </View>
         ) : (
           <>
@@ -237,24 +233,27 @@ const s = StyleSheet.create({
   header: { backgroundColor: 'transparent', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, overflow: 'hidden' },
   searchRow: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: 'transparent' },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { fontFamily: 'Poppins_900Black', fontSize: 30, color: '#000000' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: InputMetrics.radius, height: InputMetrics.height, overflow: 'hidden' },
-  searchInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text, height: '100%', textAlignVertical: 'center', paddingHorizontal: 10 },
+  headerTitle: { ...Type.display, color: '#000000' },
 
   content: { padding: 16, paddingTop: 12, flexGrow: 1 },
 
-  empty: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 80, gap: 12 },
-  emptyTitle: { fontFamily: 'Poppins_900Black', fontSize: 26, color: C.text },
-  emptyBody: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textSub, textAlign: 'center', lineHeight: 22 },
+  // flex: 1 + justifyContent: 'center' matches Trips'/Feed's empty state exactly — relies on
+  // `content` above having flexGrow: 1 so it can actually center within the full screen height
+  // rather than just the ScrollView's (otherwise zero) content height.
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 12 },
+  emptyTitle: { ...Type.emptyTitle, color: C.text },
+  // minHeight = 3 lines at this lineHeight — this is the longest of the three tabs' empty-state
+  // copy, so Trips'/Feed's shorter descriptions reserve the same space and don't shift their icon.
+  emptyBody: { ...Type.bodySmall, color: C.textSub, textAlign: 'center', lineHeight: 24, minHeight: 66 },
 
   list: { gap: 8 },
   homeCardClosed: { opacity: 0.5 },
-  homeName: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  homeName: { ...Type.cardTitle, color: C.text },
   closedTitle: { color: C.textDim },
-  homeSub: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: -2 },
-  homeTotal: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  homeSub: { ...Type.cardDesc, color: C.textSub, marginTop: -2 },
+  homeTotal: { ...Type.cardTitle, color: C.text },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   paidAmountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  paidAmountText: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.textSub, textDecorationLine: 'line-through' },
+  paidAmountText: { ...Type.cardTitle, color: C.textSub, textDecorationLine: 'line-through' },
 });

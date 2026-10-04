@@ -13,10 +13,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { Button, CircleIconButton } from '@/components/design';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { FlowSteps } from '@/components/FlowSteps';
 import { useSplitStore } from '@/store/useSplitStore';
-import { getApiKey } from './settings';
-import { parseReceipt } from '@/utils/receiptParser';
+import { getApiKey, getStorageItem, PROFILE_USES_SHARED_KEY } from './settings';
+import { supabase } from '@/lib/supabase';
+import { parseReceipt, parseReceiptViaProxy } from '@/utils/receiptParser';
+import { errorMessage } from '@/utils/errors';
 import { lightHaptic, mediumHaptic, errorHaptic } from '@/utils/haptics';
 const MIN_DIM = 60;
 // L-bracket handle dimensions — positioned INSIDE the crop box, never extending outside
@@ -60,6 +63,10 @@ export default function UploadScreen() {
   const [imgSize, setImgSize] = useState({ w: 1, h: 1 });
   const [cropBox, setCropBox] = useState({ x: 0, y: 0, w: 100, h: 100 });
   const [cropReady, setCropReady] = useState(false);
+  // Only true once the user has actually dragged a handle — until then the crop box is just the
+  // full-frame default, and scanning should use the original image untouched rather than re-derive
+  // a "full" crop through scale math that can shave pixels off the edges from rounding.
+  const [userAdjustedCrop, setUserAdjustedCrop] = useState(false);
 
   const bounds = (containerSize.w > 0 && containerSize.h > 0 && imgSize.w > 1)
     ? computeBounds(containerSize.w, containerSize.h, imgSize.w, imgSize.h)
@@ -72,9 +79,14 @@ export default function UploadScreen() {
   const imgSizeRef = useRef(imgSize);
   imgSizeRef.current = imgSize;
 
-  // Get natural image size (fallback for web where onLoad source is undefined)
+  // Get natural image size — web only, since <Image onLoad> below doesn't report `source` there.
+  // On native this used to also run and could occasionally resolve with different dimensions than
+  // onLoad (a second, separate native size-reporting path), racing to set imgSize with whichever
+  // finished last; since the crop math depends on imgSize exactly matching what's on screen, that
+  // inconsistency alone could produce a wrong crop even independent of the orientation fix above.
   useEffect(() => {
     if (!uri) { setImgSize({ w: 1, h: 1 }); setCropReady(false); return; }
+    if (Platform.OS !== 'web') return;
     Image.getSize(
       uri,
       (w, h) => { if (w > 0 && h > 0) setImgSize(p => p.w > 1 ? p : { w, h }); },
@@ -82,8 +94,11 @@ export default function UploadScreen() {
     );
   }, [uri]);
 
-  // Init crop box to cover the full displayed image (no inset)
+  // Init crop box to cover the full displayed image (no inset) — only before the user has taken
+  // control of it. Once they've adjusted it manually, this must never overwrite their box again,
+  // even if a later layout pass (e.g. during scanning) recomputes containerSize/imgSize.
   useEffect(() => {
+    if (userAdjustedCrop) return;
     const { displayW, displayH, offsetX, offsetY } = computeBounds(
       containerSize.w, containerSize.h, imgSize.w, imgSize.h,
     );
@@ -91,7 +106,7 @@ export default function UploadScreen() {
       setCropBox({ x: offsetX, y: offsetY, w: displayW, h: displayH });
       setCropReady(true);
     }
-  }, [containerSize.w, containerSize.h, imgSize.w, imgSize.h]);
+  }, [containerSize.w, containerSize.h, imgSize.w, imgSize.h, userAdjustedCrop]);
 
   // PanResponders created once; live values always from refs
   const pans = useMemo(() => {
@@ -99,7 +114,7 @@ export default function UploadScreen() {
       let start = { x: 0, y: 0, w: 0, h: 0 };
       return PanResponder.create({
         onStartShouldSetPanResponder: () => true,
-        onPanResponderGrant: () => { start = { ...cropBoxRef.current }; },
+        onPanResponderGrant: () => { start = { ...cropBoxRef.current }; setUserAdjustedCrop(true); },
         onPanResponderMove: (_, { dx, dy }) => {
           const { offsetX: ox, offsetY: oy, displayW: dw, displayH: dh } = boundsRef.current;
           const { x, y, w, h } = start;
@@ -144,7 +159,7 @@ export default function UploadScreen() {
   const clearImage = () => {
     lightHaptic();
     setUri(null); setBase64(null); setError(null);
-    setImgSize({ w: 1, h: 1 }); setCropReady(false);
+    setImgSize({ w: 1, h: 1 }); setCropReady(false); setUserAdjustedCrop(false);
   };
 
   const pickImage = async (fromCamera: boolean) => {
@@ -168,6 +183,7 @@ export default function UploadScreen() {
       setUri(asset.uri);
       setImgSize({ w: 1, h: 1 });
       setCropReady(false);
+      setUserAdjustedCrop(false);
       let b64 = asset.base64 ?? null;
       if (!b64 && Platform.OS === 'web') b64 = await uriToBase64Web(asset.uri);
       setBase64(b64);
@@ -204,10 +220,18 @@ export default function UploadScreen() {
       let scanUri = uri;
       let scanB64 = base64;
 
-      if (cropReady) {
+      if (cropReady && userAdjustedCrop) {
         const { offsetX: ox, offsetY: oy, displayW: dw, displayH: dh } = boundsRef.current;
-        const { w: iw, h: ih } = imgSizeRef.current;
         if (dw > 0 && dh > 0) {
+          // <Image onLoad> can report a downscaled size RN decoded for on-screen display (e.g.
+          // 1920x2560) rather than the photo's true full resolution (e.g. 3024x4032) — but that's
+          // exactly the space the crop box was drawn in, so it's fine for POSITIONING the box.
+          // The actual crop must be computed against the manipulator's own view of the file, or
+          // the resulting rectangle comes out scaled down and anchored toward the top-left corner
+          // of the real image, silently losing whatever's further right/down.
+          const probe = await ImageManipulator.manipulate(uri).renderAsync();
+          const iw = probe.width;
+          const ih = probe.height;
           const scaleX = iw / dw;
           const scaleY = ih / dh;
           const originX = Math.max(0, Math.round((cropBox.x - ox) * scaleX));
@@ -215,8 +239,7 @@ export default function UploadScreen() {
           const cropW = Math.max(1, Math.min(iw - originX, Math.round(cropBox.w * scaleX)));
           const cropH = Math.max(1, Math.min(ih - originY, Math.round(cropBox.h * scaleY)));
 
-          const ref = await ImageManipulator
-            .manipulate(uri)
+          const ref = await ImageManipulator.manipulate(uri)
             .crop({ originX, originY, width: cropW, height: cropH })
             .renderAsync();
           const result = await ref.saveAsync({ compress: 0.85, format: SaveFormat.JPEG, base64: true });
@@ -225,16 +248,29 @@ export default function UploadScreen() {
         }
       }
 
-      const apiKey = await getApiKey();
-      if (!apiKey) { errorHaptic(); setLoading(false); router.push('/settings'); return; }
-
-      const data = await parseReceipt(scanB64, apiKey);
+      const usesSharedKey = (await getStorageItem(PROFILE_USES_SHARED_KEY)) === '1';
+      let data;
+      if (usesSharedKey) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { errorHaptic(); setLoading(false); return; }
+        data = await parseReceiptViaProxy(scanB64, process.env.EXPO_PUBLIC_SUPABASE_URL!, session.access_token);
+      } else {
+        const apiKey = await getApiKey();
+        if (!apiKey) { errorHaptic(); setLoading(false); router.push('/settings'); return; }
+        data = await parseReceipt(scanB64, apiKey);
+      }
+      if (!data.items?.length) {
+        errorHaptic();
+        setError('Could not find any items on this receipt. Try a clearer photo, or enter items manually.');
+        setLoading(false);
+        return;
+      }
       setImage(scanUri, scanB64);
       setReceiptData(data);
       router.replace('/review');
     } catch (e: unknown) {
       errorHaptic();
-      setError(e instanceof Error ? e.message : 'Unknown error');
+      setError(errorMessage(e, 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -245,6 +281,11 @@ export default function UploadScreen() {
       <Stack.Screen options={{
         headerBackTitle: '', headerTitleAlign: 'center', title: 'Upload',
         headerTransparent: false, headerStyle: { backgroundColor: C.bg },
+        // iOS's edge-swipe-back gesture listens on the left edge of the screen, which is exactly
+        // where the crop box's left handle lives — disable it while a photo (and its crop handles)
+        // is showing so dragging that handle doesn't also trigger a navigation swipe. The header
+        // back button still works normally either way.
+        gestureEnabled: !uri,
       }} />
       <FlowSteps active={-1} />
 
@@ -296,6 +337,7 @@ export default function UploadScreen() {
                 <Text style={styles.placeholderText}>Tap to import</Text>
               </View>
             </PressBtn>
+            <Text style={styles.scanHint}>Flat, well-lit, and fully in frame scans best</Text>
           </View>
         )}
 
@@ -355,10 +397,11 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 14,
   },
   placeholderText: {
-    fontFamily: 'Poppins_600SemiBold', fontSize: 13,
+    ...Type.pillLabel,
     color: C.text, textAlign: 'center',
     lineHeight: 14,
   },
+  scanHint: { ...Type.cardDesc, color: C.textDim, textAlign: 'center', marginTop: 12 },
 
   btnRow: { flexDirection: 'row', gap: 10 },
   errorText: { color: C.error, textAlign: 'center', paddingHorizontal: 8 },

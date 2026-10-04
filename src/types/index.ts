@@ -1,10 +1,11 @@
 export interface ReceiptItem {
   id: string;
   name: string;
-  price: number;    // total price (quantity × unit price)
+  price: number;    // total price (quantity × unit price), including any modifiers below
   quantity: number;
   assignedTo: string[];
   category?: string;   // e.g. 'Drinks' | 'Apps' | 'Dessert' — used to filter the Assign screen
+  modifiers?: string[]; // sides/sauces/customizations printed under this item on the receipt
 }
 
 // One of possibly several people who paid the bill, with how much each paid.
@@ -38,10 +39,11 @@ export interface ExtraCharge {
 export interface ParsedReceipt {
   restaurantName?: string;
   receiptDate?: string;
-  items: { name: string; price: number; quantity: number }[];
+  items: { name: string; price: number; quantity: number; modifiers?: string[] }[];
   subtotal: number;
   tax: number;
   tip: number;
+  extraCharges?: { name: string; amount: number; isDiscount?: boolean }[];
   total: number;
 }
 
@@ -75,6 +77,7 @@ export interface Trip {
   currencies?: string[];       // all accepted currencies for international trips
   budget?: number;             // personal spending target for this trip
   groupBudget?: number;        // whole-group spending target for this trip
+  joinCode?: string;           // lets someone else join as a full collaborator
 }
 
 export interface Home {
@@ -86,6 +89,7 @@ export interface Home {
   endDate?: string;
   currency?: string;
   status?: 'open' | 'closed';
+  joinCode?: string;           // lets someone else join as a full collaborator
 }
 
 export interface SplitRecord {
@@ -117,4 +121,27 @@ export interface SplitRecord {
   payers?: Payer[];                // multi-payer support; first entry mirrors paidById/paidByName
   paymentStatuses?: PaymentStatus[]; // settle-up tracking per person, used by "mark as paid"
   source?: 'manual' | 'scan';       // 'manual' = entered by hand, 'scan' = from receipt photo
+  // Only set for a standalone bill (no tripId/homeId) — lets someone else join as a full
+  // collaborator. Trip/home expenses are shared via their trip's/home's own joinCode instead.
+  joinCode?: string;
+}
+
+// -- Roadmap / feedback board ----------------------------------------------------
+// Unlike everything else above, this is shared data: every signed-in account sees every
+// submission (see supabase/migrations/0007_feedback_board.sql), not just its own.
+
+export type FeedbackType = 'idea' | 'bug';
+export type FeedbackStatus = 'under_review' | 'planned' | 'in_progress' | 'done' | 'declined';
+
+export interface FeedbackItem {
+  id: string;
+  userId: string;
+  type: FeedbackType;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  status: FeedbackStatus;
+  voteCount: number;
+  createdAt: string;
+  myVote: boolean; // whether the current account has voted on this item
 }

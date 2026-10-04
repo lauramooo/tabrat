@@ -8,6 +8,7 @@ import { Text } from 'react-native-paper';
 import { CircleIconButton, IconBadge } from '@/components/design';
 import { PencilIcon, ReceiptIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
 import { fmt } from '@/utils/calculator';
 import { fmtDate } from '@/utils/date';
@@ -126,22 +127,22 @@ const s = StyleSheet.create({
     backgroundColor: C.card, borderRadius: 14,
     padding: 16,
   },
-  optionTitle: { fontFamily: 'Poppins_600SemiBold', fontSize: 16, color: C.text },
-  optionDesc: { fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.textSub, marginTop: 2 },
+  optionTitle: { ...Type.button, color: C.text },
+  optionDesc: { ...Type.cardDesc, color: C.textSub, marginTop: 2 },
 
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
-  backText: { fontFamily: 'Poppins_500Medium', fontSize: 15, color: C.primary },
-  importTitle: { fontFamily: 'Poppins_900Black', fontSize: 22, color: C.text, paddingHorizontal: 16, paddingBottom: 12 },
+  backText: { ...Type.labelMedium, color: C.primary },
+  importTitle: { ...Type.h2, color: C.text, paddingHorizontal: 16, paddingBottom: 12 },
   importList: { padding: 16, gap: 10 },
 
   importCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: C.card, borderRadius: 12, padding: 12,
   },
-  importName: { fontFamily: 'Poppins_600SemiBold', fontSize: 14, color: C.text },
-  importMeta: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: 1 },
+  importName: { ...Type.pillLabel, color: C.text },
+  importMeta: { ...Type.cardDesc, color: C.textSub, marginTop: 1 },
   importTotal: { fontFamily: 'Poppins_900Black', fontSize: 18, color: C.text },
 
   emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyText: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textSub },
+  emptyText: { ...Type.cardDesc, color: C.textSub },
 });

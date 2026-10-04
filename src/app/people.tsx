@@ -3,20 +3,19 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { BillHeader, FlowSteps } from '@/components/FlowSteps';
-import { ChevronDownCircleIcon, ChevronUpCircleIcon, PlusCircleIcon, SearchIcon, TagIcon, UserIcon, UserMultipleIcon } from '@/components/FigmaIcons';
+import { ChevronDownCircleIcon, ChevronUpCircleIcon, PlusCircleIcon, TagIcon, UserIcon, UserMultipleIcon } from '@/components/FigmaIcons';
 import { PersonChip } from '@/components/PersonChip';
-import { Button, Dropdown, DropdownRow, FieldLabel } from '@/components/design';
+import { Button, Dropdown, DropdownRow, FieldLabel, SearchInput } from '@/components/design';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { sortWithMeFirst } from '@/utils/sortPeople';
@@ -28,6 +27,7 @@ export default function PeopleScreen() {
   const { people, groups, friends, addPerson, removePerson } = useSplitStore();
   const [friendSearch, setFriendSearch] = useState('');
   const [friendDropOpen, setFriendDropOpen] = useState(false);
+  const [addPressed, setAddPressed] = useState(false);
   const [dupError, setDupError] = useState<string | null>(null);
   const [myName, setMyName] = useState('');
 
@@ -78,7 +78,7 @@ export default function PeopleScreen() {
   };
 
   const handleNext = () => {
-    if (people.length < 2) { setDupError('Add at least 2 friends to split the bill.'); return; }
+    if (people.length < 2) { setDupError('Add at least 2 rats to split the bill.'); return; }
     setDupError(null);
     mediumHaptic();
     router.replace('/assign');
@@ -104,7 +104,11 @@ export default function PeopleScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <BillHeader />
       <FlowSteps active={1} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* No KeyboardAvoidingView — it fights the ScrollView's own native "scroll the focused
+          field into view" behavior on iOS and can collapse the whole scroll area to almost
+          nothing when the keyboard opens (see manual-entry.tsx and AuthGate.tsx for the same
+          failure mode and fix). */}
+      <View style={{ flex: 1 }}>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
           {/* -- Added people as chips -- */}
@@ -132,33 +136,32 @@ export default function PeopleScreen() {
 
           {/* -- Search card with dropdown -- */}
           <View style={{ position: 'relative', zIndex: showDrop ? 20 : 0 }}>
-            <View style={styles.card}>
-              <View style={styles.searchRow}>
-                <SearchIcon color={C.text} size={15} />
-                <TextInput
-                  style={[styles.searchInput, { outlineWidth: 0 } as any]}
-                  value={friendSearch}
-                  onChangeText={(t) => { setFriendSearch(t); setDupError(null); }}
-                  onFocus={() => setFriendDropOpen(true)}
-                  onBlur={() => setTimeout(() => setFriendDropOpen(false), 150)}
-                  placeholder="Search friends or groups"
-                  placeholderTextColor={C.textDim}
-                  onSubmitEditing={() => handleAdd()}
-                  returnKeyType="done"
-                />
-                {friendSearch.trim() ? (
-                  <PressBtn onPress={() => handleAdd()} hitSlop={8} activeOpacity={0.7}>
-                    <PlusCircleIcon color={C.primary} size={15} />
-                  </PressBtn>
-                ) : (
-                  <PressBtn onPress={() => setFriendDropOpen((o) => !o)} hitSlop={8} activeOpacity={0.7}>
-                    {friendDropOpen
-                      ? <ChevronUpCircleIcon color={C.text} size={15} />
-                      : <ChevronDownCircleIcon color={C.text} size={15} />}
-                  </PressBtn>
-                )}
-              </View>
-            </View>
+            <SearchInput
+              value={friendSearch}
+              onChangeText={(t) => { setFriendSearch(t); setDupError(null); }}
+              onFocus={() => setFriendDropOpen(true)}
+              onBlur={() => setTimeout(() => setFriendDropOpen(false), 150)}
+              placeholder="Search rats or groups"
+              onSubmitEditing={() => handleAdd()}
+              returnKeyType="done"
+              trailing={friendSearch.trim() ? (
+                <PressBtn
+                  onPress={() => handleAdd()}
+                  onPressIn={() => setAddPressed(true)}
+                  onPressOut={() => setAddPressed(false)}
+                  hitSlop={8}
+                  activeOpacity={0.7}
+                >
+                  <PlusCircleIcon color={C.primary} size={15} strokeWidth={1.8} filled={addPressed} />
+                </PressBtn>
+              ) : (
+                <PressBtn onPress={() => setFriendDropOpen((o) => !o)} hitSlop={8} activeOpacity={0.7}>
+                  {friendDropOpen
+                    ? <ChevronUpCircleIcon color={C.text} size={15} />
+                    : <ChevronDownCircleIcon color={C.text} size={15} />}
+                </PressBtn>
+              )}
+            />
             <Dropdown mode="inline" visible={showDrop} position={{ top: InputMetrics.height + 6 }} onClose={() => setFriendDropOpen(false)}>
               {filteredFriends.map((f) => (
                 <DropdownRow key={f.id} icon={<UserIcon size={15} color={C.textSub} />} onPress={() => { lightHaptic(); handleAdd(f.name); }}>
@@ -183,7 +186,7 @@ export default function PeopleScreen() {
           {people.length === 0 && !friendSearch && (
             <View style={styles.empty}>
               <UserMultipleIcon size={52} color={C.textDim} />
-              <Text style={styles.emptyTitle}>Add friends to split with</Text>
+              <Text style={styles.emptyTitle}>Add rats to split with</Text>
               <Text style={styles.emptyText}>Add at least 2 people to continue</Text>
             </View>
           )}
@@ -199,7 +202,7 @@ export default function PeopleScreen() {
             onPress={handleNext}
           />
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -212,16 +215,13 @@ const styles = StyleSheet.create({
   chipsSection: { gap: 10 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
-  card: { backgroundColor: C.card, borderRadius: 10, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-  searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: InputMetrics.height, gap: 10 },
-  searchInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text },
-  dropName: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
-  dropSub: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textDim },
+  dropName: { flex: 1, ...Type.labelMedium, color: C.text },
+  dropSub: { ...Type.cardDesc, color: C.textDim },
 
-  errorText: { color: C.error, fontSize: 13, fontFamily: 'Poppins_400Regular' },
+  errorText: { color: C.error, ...Type.cardDesc },
   empty: { alignItems: 'center', paddingTop: 48, gap: 12 },
-  emptyTitle: { fontFamily: 'Poppins_600SemiBold', fontSize: 16, color: C.text },
-  emptyText: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textSub, textAlign: 'center' },
+  emptyTitle: { ...Type.button, color: C.text },
+  emptyText: { ...Type.cardDesc, color: C.textSub, textAlign: 'center' },
 
   footer: { padding: 16, paddingTop: 8 },
 });

@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Avatar } from '@/components/Avatar';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { fmt } from '@/utils/calculator';
 import { Card } from './Card';
 import { Divider } from './Divider';
@@ -33,6 +34,6 @@ export function RunningTotalsCard({ people, currency }: {
 const s = StyleSheet.create({
   card: { backgroundColor: C.card, borderRadius: 10, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  name: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
-  amount: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  name: { flex: 1, ...Type.labelMedium, color: C.text },
+  amount: { ...Type.cardTitle, color: C.text },
 });

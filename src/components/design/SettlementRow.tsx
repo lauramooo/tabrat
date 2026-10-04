@@ -6,6 +6,7 @@ import { ActionPill } from '@/components/ActionPill';
 import { Avatar } from '@/components/Avatar';
 import { CheckCircleIcon, SortIcon } from '@/components/FigmaIcons';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { fmt } from '@/utils/calculator';
 import { Card } from './Card';
 
@@ -82,9 +83,9 @@ export function SettlementRow({ txn, avatarIdx, scopePerson, myName, currency, p
 const s = StyleSheet.create({
   payCircle: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
-  total: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
-  desc: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: -2 },
+  title: { ...Type.cardTitle, color: C.text },
+  total: { ...Type.cardTitle, color: C.text },
+  desc: { ...Type.cardDesc, color: C.textSub, marginTop: -2 },
   paidRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  paidText: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.textSub, textDecorationLine: 'line-through' },
+  paidText: { ...Type.cardTitle, color: C.textSub, textDecorationLine: 'line-through' },
 });

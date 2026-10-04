@@ -1,10 +1,11 @@
 import { Stack } from 'expo-router';
 import { PressBtn } from '@/components/PressBtn';
+import { ActionPill } from '@/components/ActionPill';
 import { Avatar } from '@/components/Avatar';
 import { PencilIcon, PlusIcon, TrashIcon, UserIcon, UserMultipleIcon } from '@/components/FigmaIcons';
 import { useMemo, useRef, useState } from 'react';
 import {
-  Animated, ScrollView, SectionList,
+  ScrollView, SectionList,
   StyleSheet, TextInput, View,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -49,14 +50,14 @@ function EditFriendModal({ friend, onClose }: { friend: Person | null; onClose: 
   };
 
   return (
-    <CenteredModal visible={!!friend} onClose={onClose} title={<Text style={{ ...Type.h1, color: C.text }}>Edit friend</Text>}>
+    <CenteredModal visible={!!friend} onClose={onClose} title={<Text style={{ ...Type.h1, color: C.text }}>Edit rat</Text>}>
       <FieldLabel>NAME</FieldLabel>
       <Input
         style={s.input}
         value={name}
         onChangeText={setName}
         autoFocus
-        placeholder="Friend's name"
+        placeholder="Rat's name"
         placeholderTextColor={C.textDim}
       />
 
@@ -92,46 +93,32 @@ function EditFriendModal({ friend, onClose }: { friend: Person | null; onClose: 
 
 // -- Friend row ----------------------------------------------------------------
 
-function FriendRow({ friend, index, onEdit }: { friend: Person; index: number; onEdit: () => void }) {
+function FriendRow({ friend, index, sharedCount, onEdit }: { friend: Person; index: number; sharedCount: number; onEdit: () => void }) {
   const { removeFriend } = useSplitStore();
   const swipeRef = useRef<Swipeable>(null);
   const color = AVATAR_PALETTE[index % AVATAR_PALETTE.length];
+  const subtitle = sharedCount > 0 ? `${sharedCount} shared bill${sharedCount !== 1 ? 's' : ''}` : 'No shared bills yet';
 
   return (
     <Swipeable
       ref={swipeRef}
       overshootLeft={false}
       overshootRight={false}
-      renderRightActions={(p) => {
-        const w = p.interpolate({ inputRange: [0, 1], outputRange: [36, 74], extrapolate: 'clamp' });
-        const op = p.interpolate({ inputRange: [0.5, 0.9], outputRange: [0, 1], extrapolate: 'clamp' });
-        return (
-          <PressBtn style={s.swipeActionWrap}
-            onPress={() => { lightHaptic(); swipeRef.current?.close(); removeFriend(friend.id); }} activeOpacity={0.85}>
-            <Animated.View style={[s.swipePill, { width: w, backgroundColor: '#D95F52' }]}>
-              <TrashIcon color="#fff" size={15} />
-              <Animated.Text style={[s.swipePillText, { opacity: op }]}>Remove</Animated.Text>
-            </Animated.View>
-          </PressBtn>
-        );
-      }}
-      renderLeftActions={(p) => {
-        const w = p.interpolate({ inputRange: [0, 1], outputRange: [36, 74], extrapolate: 'clamp' });
-        const op = p.interpolate({ inputRange: [0.5, 0.9], outputRange: [0, 1], extrapolate: 'clamp' });
-        return (
-          <PressBtn style={s.swipeActionWrap}
-            onPress={() => { lightHaptic(); swipeRef.current?.close(); onEdit(); }} activeOpacity={0.85}>
-            <Animated.View style={[s.swipePill, { width: w, backgroundColor: '#4A90D9' }]}>
-              <PencilIcon color="#fff" size={15} />
-              <Animated.Text style={[s.swipePillText, { opacity: op }]}>Edit</Animated.Text>
-            </Animated.View>
-          </PressBtn>
-        );
-      }}
+      renderRightActions={(p) => (
+        <ActionPill progress={p} iconNode={(c) => <TrashIcon color={c} size={15} />} label="Remove" color="#D95F52" textColor="#fff"
+          onPress={() => { lightHaptic(); swipeRef.current?.close(); removeFriend(friend.id); }} />
+      )}
+      renderLeftActions={(p) => (
+        <ActionPill progress={p} iconNode={(c) => <PencilIcon color={c} size={15} />} label="Edit" color="#4A90D9" textColor="#fff"
+          onPress={() => { lightHaptic(); swipeRef.current?.close(); onEdit(); }} />
+      )}
     >
       <Card onPress={onEdit} pressBorderColor={color.bg} style={s.row}>
         <Avatar name={friend.name} index={index} size={42} />
-        <Text style={s.name}>{friend.name}</Text>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={s.name} numberOfLines={1}>{friend.name}</Text>
+          <Text style={s.friendSub} numberOfLines={1}>{subtitle}</Text>
+        </View>
       </Card>
     </Swipeable>
   );
@@ -187,14 +174,14 @@ export default function FriendsScreen() {
   const sorted = [...friends].sort((a, b) => a.name.localeCompare(b.name));
 
   const sections = [
-    ...(sorted.length > 0 ? [{ title: 'MY FRIENDS', data: sorted, kind: 'friend' as const }] : []),
+    ...(sorted.length > 0 ? [{ title: 'MY RATS', data: sorted, kind: 'friend' as const }] : []),
     ...(suggestions.length > 0 ? [{ title: 'FROM YOUR BILLS', data: suggestions.map(n => ({ id: n, name: n })), kind: 'suggestion' as const }] : []),
   ];
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <Stack.Screen options={{
-        title: 'Friends',
+        title: 'Rats',
         headerTransparent: false,
         headerStyle: { backgroundColor: C.bg },
       }} />
@@ -204,7 +191,7 @@ export default function FriendsScreen() {
           style={s.addInput}
           value={input}
           onChangeText={setInput}
-          placeholder="Friend's name"
+          placeholder="Rat's name"
           placeholderTextColor={C.textDim}
           onSubmitEditing={handleAdd}
           returnKeyType="done"
@@ -213,7 +200,7 @@ export default function FriendsScreen() {
         <PressBtn
           style={[s.addCircle, input.trim().length > 0 && s.addCircleActive]}
           onPress={handleAdd} activeOpacity={0.7} disabled={!input.trim()}>
-          <PlusIcon color={input.trim() ? '#fff' : C.textDim} size={20} />
+          <PlusIcon color={C.text} size={20} />
         </PressBtn>
       </View>
 
@@ -222,8 +209,8 @@ export default function FriendsScreen() {
           <IconBadge size={72} bg={C.card}>
             <UserIcon size={32} color={C.textSub} />
           </IconBadge>
-          <Text style={s.emptyTitle}>No friends yet</Text>
-          <Text style={s.emptyDesc}>Add friends to quickly add them to future tabs and trips.</Text>
+          <Text style={s.emptyTitle}>No rats yet</Text>
+          <Text style={s.emptyDesc}>Add rats to quickly add them to future tabs and trips.</Text>
         </View>
       ) : (
         <SectionList
@@ -231,7 +218,12 @@ export default function FriendsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item, index, section }) =>
             (section as any).kind === 'friend' ? (
-              <FriendRow friend={item as Person} index={index} onEdit={() => setEditFriend(item as Person)} />
+              <FriendRow
+                friend={item as Person}
+                index={index}
+                sharedCount={history.filter((r) => r.people.some((p) => p.toLowerCase() === (item as Person).name.toLowerCase())).length}
+                onEdit={() => setEditFriend(item as Person)}
+              />
             ) : (
               <SuggestionRow name={item.name}
                 onAdd={() => { selectionHaptic(); addFriend(item.name); }} />
@@ -261,28 +253,25 @@ const s = StyleSheet.create({
 
   addBar: { flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 8 },
   addInput: { flex: 1, minWidth: 0 },
-  addCircle: { width: InputMetrics.height, height: InputMetrics.height, borderRadius: InputMetrics.radius, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center' },
-  addCircleActive: { backgroundColor: C.primary, borderColor: C.primary },
+  addCircle: { width: InputMetrics.height, height: InputMetrics.height, borderRadius: 999, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center' },
+  addCircleActive: { backgroundColor: C.yellow, borderColor: C.text },
 
   sectionHeader: { paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: C.card, borderRadius: Radius.sm, padding: Spacing.md },
   suggRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: C.card, borderRadius: Radius.sm, padding: Spacing.md },
   avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: C.primaryDim, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontFamily: 'Poppins_700Bold', fontSize: 15, color: C.primary },
-  name: { fontFamily: 'Poppins_500Medium', fontSize: 15, color: C.text },
-
-  swipeActionWrap: { width: 80, justifyContent: 'center', alignItems: 'center' },
-  swipePill: { height: 36, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 8, overflow: 'hidden' },
-  swipePillText: { color: '#fff', fontSize: 11, fontFamily: 'Poppins_500Medium' },
+  avatarText: { ...Type.cardTitle, color: C.primary },
+  name: { ...Type.cardTitle, color: C.text },
+  friendSub: { ...Type.cardDesc, color: C.textSub, marginTop: -2 },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
-  emptyTitle: { fontFamily: 'Poppins_900Black', fontSize: 26, color: C.text },
-  emptyDesc: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textSub, textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { ...Type.emptyTitle, color: C.text },
+  emptyDesc: { ...Type.cardDesc, color: C.textSub, textAlign: 'center', lineHeight: 22 },
 
   // Modal
   input: {},
   groupChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
   groupChipActive: { backgroundColor: C.primaryDim, borderColor: C.primary + '60' },
-  groupChipText: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.text },
+  groupChipText: { ...Type.labelMedium, color: C.text },
 });

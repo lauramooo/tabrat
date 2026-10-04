@@ -31,7 +31,16 @@ yarn-error.*
 *.pem
 
 # local env files
-.env*.local
+.env
+.env.*
+!.env.example
+.supabase-db-password.tmp
+
+# Google Play service account key (used by eas.json submit.android.serviceAccountKeyPath) —
+# grants publishing access to the Play Console, must never be committed.
+google-service-account.json
+*serviceAccount*.json
+pc-api-*.json
 
 # typescript
 *.tsbuildinfo

@@ -4,6 +4,7 @@ import { Text } from 'react-native-paper';
 import { CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, SortIcon } from '@/components/FigmaIcons';
 import { PressBtn } from '@/components/PressBtn';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator';
 import { fmtDate } from '@/utils/date';
@@ -103,16 +104,16 @@ export function PayModal({ from, to, maxAmount, currency, breakdown, paymentHist
 const s = StyleSheet.create({
   title: { fontFamily: 'Poppins_900Black', fontSize: 20, color: C.text, marginBottom: 4 },
   lineRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
-  lineName: { flex: 1, color: C.text, fontFamily: 'Poppins_400Regular', fontSize: 13 },
-  lineAmt: { color: C.text, fontFamily: 'Poppins_600SemiBold', fontSize: 13 },
+  lineName: { flex: 1, color: C.text, ...Type.cardDesc },
+  lineAmt: { color: C.text, ...Type.pillLabel },
   divider: { backgroundColor: C.border, marginVertical: 8 },
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
-  totalLabel: { fontFamily: 'Poppins_700Bold', fontSize: 14, color: C.text },
+  totalLabel: { ...Type.cardTitle, color: C.text },
   totalAmt: { fontFamily: 'Poppins_900Black', fontSize: 18, color: C.text },
   expandActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   partialRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.card, borderRadius: InputMetrics.radius, height: InputMetrics.height, paddingHorizontal: 12 },
-  partialSign: { fontFamily: 'Poppins_600SemiBold', fontSize: 18, color: C.textSub },
-  partialInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text, padding: 0 },
+  partialSign: { ...Type.buttonLg, color: C.textSub },
+  partialInput: { flex: 1, minWidth: 0, ...Type.bodySmall, color: C.text, padding: 0 },
   historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, marginTop: 4 },
-  historyLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: C.textSub },
+  historyLabel: { ...Type.pillLabel, color: C.textSub },
 });

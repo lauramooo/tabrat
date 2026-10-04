@@ -12,11 +12,20 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { configureFonts, MD3LightTheme, PaperProvider } from 'react-native-paper';
+import type { Session } from '@supabase/supabase-js';
+import { AuthGate } from '@/components/AuthGate';
+import { OnboardingScreen } from '@/components/OnboardingScreen';
+import { WelcomeScreen } from '@/components/WelcomeScreen';
 import { C } from '@/constants/colors';
+import { bootstrapAuthSync } from '@/lib/authSync';
+import { supabase } from '@/lib/supabase';
+import { getStorageItem, setStorageItem } from '@/app/settings';
+
+const WELCOME_SEEN_KEY = 'welcome_seen';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -76,11 +85,82 @@ export default function RootLayout() {
     Poppins_700Bold,
   });
 
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | undefined>(undefined);
+  const [welcomeSeen, setWelcomeSeen] = useState<boolean | undefined>(undefined);
+  const justSignedIn = useRef(false);
+
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) return null;
+  useEffect(() => {
+    getStorageItem(WELCOME_SEEN_KEY).then((v) => setWelcomeSeen(!!v));
+  }, []);
+
+  // Reads the cached session from AsyncStorage — near-instant, not a network round-trip — to
+  // decide whether to show the sign-in gate or the app. Also drives the pull-on-login/
+  // guest-migration sync in the background once signed in.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'SIGNED_IN') justSignedIn.current = true;
+      setSession(s);
+    });
+    bootstrapAuthSync();
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Whenever a session exists, check whether this account has finished onboarding (has a
+  // username) — covers a brand-new signup and any pre-existing account that closed the app
+  // mid-onboarding, not just fresh sign-ins.
+  useEffect(() => {
+    if (!session) { setNeedsOnboarding(undefined); return; }
+    let cancelled = false;
+    supabase.from('profiles').select('username').eq('id', session.user.id).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setNeedsOnboarding(!data?.username); });
+    return () => { cancelled = true; };
+  }, [session]);
+
+  // Swapping from AuthGate/onboarding to the real <Stack> doesn't touch the router — on web
+  // especially, whatever URL happened to already be in the address bar (stale from a previous
+  // session, or wherever an OAuth redirect landed) is what the Stack renders once it mounts.
+  // Force a fresh sign-in back to the Feed instead of wherever that URL happens to point — wait
+  // for onboarding to actually finish first so this doesn't fire while it's still showing.
+  useEffect(() => {
+    if (session && needsOnboarding === false && justSignedIn.current) {
+      justSignedIn.current = false;
+      router.replace('/');
+    }
+  }, [session, needsOnboarding, router]);
+
+  if (!fontsLoaded || session === undefined || welcomeSeen === undefined) return null;
+
+  if (!session) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: C.bg }]} />
+        <StatusBar style="dark" />
+        {welcomeSeen ? (
+          <AuthGate />
+        ) : (
+          <WelcomeScreen onGetStarted={() => { setStorageItem(WELCOME_SEEN_KEY, '1'); setWelcomeSeen(true); }} />
+        )}
+      </GestureHandlerRootView>
+    );
+  }
+
+  if (needsOnboarding === undefined) return null;
+
+  if (needsOnboarding) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: C.bg }]} />
+        <StatusBar style="dark" />
+        <OnboardingScreen onComplete={() => setNeedsOnboarding(false)} />
+      </GestureHandlerRootView>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -115,12 +195,12 @@ export default function RootLayout() {
           <Stack.Screen name="settings" options={{ title: 'Settings', presentation: 'modal' }} />
           <Stack.Screen name="upload" options={{ title: 'Upload' }} />
           <Stack.Screen name="review" options={{ title: 'Review items' }} />
-          <Stack.Screen name="people" options={{ title: 'Add friends' }} />
+          <Stack.Screen name="people" options={{ title: 'Add rats' }} />
           <Stack.Screen name="assign" options={{ title: 'Assign items' }} />
           <Stack.Screen name="summary" options={{ title: 'Summary' }} />
           <Stack.Screen name="groups" options={{ title: 'Groups' }} />
           <Stack.Screen name="tabs" options={{ title: 'Split history' }} />
-          <Stack.Screen name="friends" options={{ title: 'Friends' }} />
+          <Stack.Screen name="friends" options={{ title: 'Rats' }} />
           <Stack.Screen name="trip/new" options={{ title: 'New trip' }} />
           <Stack.Screen name="trip/[id]" options={{ title: 'Trips', headerBackTitle: 'Trips' }} />
           <Stack.Screen name="trip/expense" options={{ title: 'Add expense' }} />

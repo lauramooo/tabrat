@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { Button, Card, Divider, FieldLabel, Input } from '@/components/design';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { lightHaptic, mediumHaptic } from '@/utils/haptics';
@@ -147,7 +148,7 @@ const s = StyleSheet.create({
   content: { padding: 16, gap: 16 },
 
   hint: {
-    fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.textDim,
+    ...Type.cardDesc, color: C.textDim,
     lineHeight: 18, paddingHorizontal: 2,
   },
 
@@ -156,14 +157,14 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 16, paddingVertical: 13,
   },
-  catName: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 15, color: C.text },
+  catName: { flex: 1, ...Type.labelMedium, color: C.text },
   catEditInput: {
-    flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text,
+    flex: 1, minWidth: 0, ...Type.bodySmall, color: C.text,
     padding: 0, borderBottomWidth: 1.5, borderBottomColor: C.primary, paddingBottom: 2,
   },
   actionBtn: { padding: 2 },
   emptyRow: { paddingVertical: 20, alignItems: 'center' },
-  emptyText: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textDim },
+  emptyText: { ...Type.cardDesc, color: C.textDim },
 
   addRow: { flexDirection: 'row', gap: 10 },
   addInput: { flex: 1 },

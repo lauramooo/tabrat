@@ -2,13 +2,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressBtn } from '@/components/PressBtn';
 import { CloseCircleIcon, FriendsIcon, MinusCircleIcon, PencilIcon, PlusCircleIcon, PlusIcon, ReorderIcon, TrashIcon } from '@/components/FigmaIcons';
 import { useRouter } from 'expo-router';
-import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
+import { ScaleDecorator, NestableDraggableFlatList, NestableScrollContainer } from 'react-native-draggable-flatlist';
 import { useRef, useState } from 'react';
 import {
   Animated,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -16,8 +13,9 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
-import { Button, CenteredModal, Card, Divider, FieldLabel, Input } from '@/components/design';
+import { Button, CenteredModal, FieldLabel, Input } from '@/components/design';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { BillHeader, FlowSteps } from '@/components/FlowSteps';
 import { useSplitStore } from '@/store/useSplitStore';
@@ -25,7 +23,7 @@ import { fmt, sanitizeNumberInput } from '@/utils/calculator';
 import { lightHaptic, mediumHaptic } from '@/utils/haptics';
 import type { ExtraCharge } from '@/types';
 
-type ItemData = { id: string; name: string; price: number; quantity: number };
+type ItemData = { id: string; name: string; price: number; quantity: number; modifiers?: string[] };
 
 // -- Item row ------------------------------------------------------------------
 
@@ -58,6 +56,11 @@ function ItemRow({ item, onEdit, drag, isActive }: {
         ref={swipeRef}
         overshootRight={false}
         enabled={!isActive}
+        // Swipeable only constrains itself to horizontal movement (activeOffsetX) — without also
+        // telling it to fail fast on vertical movement, it can hang onto the touch briefly on iOS
+        // before handing off to the parent scroll view, which is exactly what blocked scrolling
+        // when a drag started on top of a row.
+        failOffsetY={[-10, 10]}
         renderRightActions={(progress) => (
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <ActionPill
@@ -76,14 +79,19 @@ function ItemRow({ item, onEdit, drag, isActive }: {
             <ReorderIcon color={C.textDim} size={14} />
           </PressBtn>
           <PressBtn
-            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            style={{ flex: 1 }}
             onPress={() => { lightHaptic(); onEdit(item); }}
             activeOpacity={0.6}
             noShadow
           >
-            <Text style={s.itemName} numberOfLines={1}>{item.name}</Text>
-            <Text style={s.itemQty}>×{item.quantity}</Text>
-            <Text style={s.itemPrice}>{fmt(item.price)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={s.itemName} numberOfLines={1}>{item.name}</Text>
+              <Text style={s.itemQty}>×{item.quantity}</Text>
+              <Text style={s.itemPrice}>{fmt(item.price)}</Text>
+            </View>
+            {!!item.modifiers?.length && (
+              <Text style={s.itemModifiers} numberOfLines={2}>{item.modifiers.join(', ')}</Text>
+            )}
           </PressBtn>
         </View>
       </Swipeable>
@@ -91,47 +99,67 @@ function ItemRow({ item, onEdit, drag, isActive }: {
   );
 }
 
-// -- Extra charge / discount row -----------------------------------------------
+// -- Extra charge / discount section (styled like the Tax/Tip sections below) --
 
-function ExtraChargeRow({ charge }: { charge: ExtraCharge }) {
+function ExtraChargeRow({ charge, subtotal, focusedInput, setFocusedInput }: {
+  charge: ExtraCharge; subtotal: number;
+  focusedInput: string | null; setFocusedInput: (v: string | null) => void;
+}) {
   const { updateExtraCharge, removeExtraCharge } = useSplitStore();
   const [localName, setLocalName] = useState(charge.name);
-  const [localAmt, setLocalAmt] = useState(charge.amount > 0 ? charge.amount.toFixed(2) : '');
+  const [pct, setPct] = useState(() => subtotal > 0 && charge.amount > 0 ? ((charge.amount / subtotal) * 100).toFixed(2) : '');
+  const [dollar, setDollar] = useState(charge.amount > 0 ? charge.amount.toFixed(2) : '');
 
-  const commit = () => {
-    updateExtraCharge(charge.id, localName || (charge.isDiscount ? 'Discount' : 'Charge'), parseFloat(localAmt) || 0);
+  const nameFor = (n: string) => n || (charge.isDiscount ? 'Discount' : 'Charge');
+  const commitName = () => updateExtraCharge(charge.id, nameFor(localName), parseFloat(dollar) || 0);
+  const onPctChange = (raw: string) => {
+    const v = sanitizeNumberInput(raw);
+    setPct(v);
+    const d = subtotal * (parseFloat(v) || 0) / 100;
+    const dStr = d > 0 ? d.toFixed(2) : '';
+    setDollar(dStr);
+    updateExtraCharge(charge.id, nameFor(localName), parseFloat(dStr) || 0);
   };
+  const onDollarChange = (raw: string) => {
+    const v = sanitizeNumberInput(raw);
+    setDollar(v);
+    const p = subtotal > 0 ? (parseFloat(v) || 0) / subtotal * 100 : 0;
+    setPct(p > 0 ? p.toFixed(2) : '');
+    updateExtraCharge(charge.id, nameFor(localName), parseFloat(v) || 0);
+  };
+  const pctKey = `charge-${charge.id}-pct`;
+  const dollarKey = `charge-${charge.id}-dollar`;
 
   return (
-    <View style={s.extraRow}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 4 }}>
-        {charge.isDiscount && <Text style={s.discountMinus}>-</Text>}
+    <View>
+      <View style={s.chargeHeaderRow}>
         <TextInput
-          style={[s.extraNameInput, { outlineWidth: 0 } as any]}
+          style={[s.chargeNameInput, { outlineWidth: 0 } as any]}
           value={localName}
           onChangeText={setLocalName}
-          onBlur={commit}
+          onBlur={commitName}
           placeholder={charge.isDiscount ? 'Discount' : 'Charge'}
           placeholderTextColor={C.textDim}
-          selectTextOnFocus
           autoComplete="off"
         />
+        <PressBtn onPress={() => { lightHaptic(); removeExtraCharge(charge.id); }} hitSlop={8}>
+          <CloseCircleIcon size={16} color={C.textDim} />
+        </PressBtn>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
-        <Text style={s.extraDollar}>{charge.isDiscount ? '-$' : '$'}</Text>
-        <TextInput
-          style={[s.extraAmtInput, { outlineWidth: 0 } as any]}
-          value={localAmt}
-          onChangeText={(v) => setLocalAmt(sanitizeNumberInput(v))}
-          onBlur={commit}
-          keyboardType="decimal-pad"
-          placeholder="0.00"
-          placeholderTextColor={C.textDim}
-        />
+      <View style={s.ttRow}>
+        <View style={s.ttCol1}>
+          <View style={[s.ttBox, focusedInput === pctKey && s.ttBoxFocused]}>
+            <Text style={s.ttPrefix}>%</Text>
+            <TextInput style={[s.ttInput, { outlineWidth: 0 } as any]} value={pct} onChangeText={onPctChange} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={C.textDim} onFocus={() => setFocusedInput(pctKey)} onBlur={() => setFocusedInput(null)} />
+          </View>
+        </View>
+        <View style={s.ttCol2}>
+          <View style={[s.ttBox, focusedInput === dollarKey && s.ttBoxFocused]}>
+            <Text style={s.ttPrefix}>{charge.isDiscount ? '-$' : '$'}</Text>
+            <TextInput style={[s.ttInput, { outlineWidth: 0 } as any]} value={dollar} onChangeText={onDollarChange} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={C.textDim} onFocus={() => setFocusedInput(dollarKey)} onBlur={() => setFocusedInput(null)} />
+          </View>
+        </View>
       </View>
-      <PressBtn onPress={() => { lightHaptic(); removeExtraCharge(charge.id); }} hitSlop={8}>
-        <CloseCircleIcon size={18} color={C.textDim} />
-      </PressBtn>
     </View>
   );
 }
@@ -278,22 +306,36 @@ function ItemModal({ visible, editItem, onClose }: { visible: boolean; editItem:
 
 // -- Charge modal ----------------------------------------------------------------
 
-function ChargeModal({ visible, initialIsDiscount = false, onClose }: { visible: boolean; initialIsDiscount?: boolean; onClose: () => void }) {
+function ChargeModal({ visible, initialIsDiscount = false, subtotal, onClose }: { visible: boolean; initialIsDiscount?: boolean; subtotal: number; onClose: () => void }) {
   const { addExtraChargeWithDetails } = useSplitStore();
   const [name, setName] = useState('');
+  const [pct, setPct] = useState('');
   const [amount, setAmount] = useState('');
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocused] = useState<'pct' | 'amount' | null>(null);
 
   const prevVisible = useRef(false);
   if (visible && !prevVisible.current) {
     prevVisible.current = true;
   } else if (!visible && prevVisible.current) {
     prevVisible.current = false;
-    setName(''); setAmount('');
+    setName(''); setPct(''); setAmount('');
   }
 
   const isDiscount = initialIsDiscount;
   const parsedAmount = parseFloat(amount) || 0;
+
+  const onPctChange = (raw: string) => {
+    const v = sanitizeNumberInput(raw);
+    setPct(v);
+    const d = subtotal * (parseFloat(v) || 0) / 100;
+    setAmount(d > 0 ? d.toFixed(2) : '');
+  };
+  const onAmountChange = (raw: string) => {
+    const v = sanitizeNumberInput(raw);
+    setAmount(v);
+    const p = subtotal > 0 ? (parseFloat(v) || 0) / subtotal * 100 : 0;
+    setPct(p > 0 ? p.toFixed(2) : '');
+  };
 
   const submit = () => {
     if (parsedAmount <= 0) return;
@@ -309,16 +351,30 @@ function ChargeModal({ visible, initialIsDiscount = false, onClose }: { visible:
         placeholder={isDiscount ? 'Discount' : 'Charge'} placeholderTextColor={C.textDim} value={name} onChangeText={setName}
         autoFocus
       />
-      <View>
-        <Text style={s.modalLabel}>Amount</Text>
-        <View style={[s.modalPriceBox, focused && s.modalInputFocused]}>
-          <Text style={s.modalPriceDollar}>{isDiscount ? '-$' : '$'}</Text>
-          <TextInput
-            style={[s.modalPriceInput, { outlineWidth: 0 } as any]}
-            value={amount} onChangeText={(v) => setAmount(sanitizeNumberInput(v))} keyboardType="decimal-pad"
-            placeholder="0.00" placeholderTextColor={C.textDim}
-            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          />
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.modalLabel}>Percent</Text>
+          <View style={[s.modalPriceBox, focused === 'pct' && s.modalInputFocused]}>
+            <Text style={s.modalPriceDollar}>%</Text>
+            <TextInput
+              style={[s.modalPriceInput, { outlineWidth: 0 } as any]}
+              value={pct} onChangeText={onPctChange} keyboardType="decimal-pad"
+              placeholder="0" placeholderTextColor={C.textDim}
+              onFocus={() => setFocused('pct')} onBlur={() => setFocused(null)}
+            />
+          </View>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.modalLabel}>Amount</Text>
+          <View style={[s.modalPriceBox, focused === 'amount' && s.modalInputFocused]}>
+            <Text style={s.modalPriceDollar}>{isDiscount ? '-$' : '$'}</Text>
+            <TextInput
+              style={[s.modalPriceInput, { outlineWidth: 0 } as any]}
+              value={amount} onChangeText={onAmountChange} keyboardType="decimal-pad"
+              placeholder="0.00" placeholderTextColor={C.textDim}
+              onFocus={() => setFocused('amount')} onBlur={() => setFocused(null)}
+            />
+          </View>
         </View>
       </View>
       <View style={s.modalBtns}>
@@ -380,29 +436,36 @@ export default function ReviewScreen() {
       <BillHeader />
       <FlowSteps active={0} />
 
-
-
       {/* -- Main scroll -- */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+      {/* No KeyboardAvoidingView — it fights the ScrollView's own native "scroll the focused
+          field into view" behavior on iOS and can collapse the whole scroll area to almost
+          nothing when the keyboard opens (see manual-entry.tsx and AuthGate.tsx for the same
+          failure mode and fix). The plain scroll container already lifts the focused field on
+          its own. */}
+      <View style={{ flex: 1 }}>
+        <NestableScrollContainer style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
           {/* Line items */}
           <Text style={s.sectionLabel}>LINE ITEMS</Text>
           <View style={s.itemList}>
-            <DraggableFlatList
+            <NestableDraggableFlatList
               data={items}
               keyExtractor={(item) => item.id}
               onDragEnd={({ data }) => setItemOrder(data.map((i) => i.id))}
               renderItem={({ item, drag, isActive }) => (
                 <ItemRow item={item} onEdit={openEdit} drag={drag} isActive={isActive} />
               )}
-              scrollEnabled={false}
-              activationDistance={5}
+              // No activationDistance override — its internal drag-tracking pan gesture uses that
+              // value as its own activation threshold for ANY vertical movement in the list, not
+              // just while actually dragging a cell (drag only starts via the reorder handle's
+              // long-press below). A low value made that gesture win the race against the parent
+              // scroll view on every touch, which is exactly what was blocking normal scrolling.
+              // The library's own default threshold is tuned to coexist with nested scrolling.
             />
           </View>
 
-          {/* Tax & Tip — always visible */}
-          <View style={{ gap: 12, marginTop: 16 }}>
+          {/* Tax, then any receipt-read charges/discounts, then Tip, then Add charge/discount last */}
+          <View style={{ gap: 16, marginTop: 16 }}>
             <View>
               <FieldLabel>Tax</FieldLabel>
               <View style={s.ttRow}>
@@ -420,6 +483,10 @@ export default function ReviewScreen() {
                 </View>
               </View>
             </View>
+
+            {extraCharges.map((charge) => (
+              <ExtraChargeRow key={charge.id} charge={charge} subtotal={subtotal} focusedInput={focusedInput} setFocusedInput={setFocusedInput} />
+            ))}
 
             <View>
               <FieldLabel>Tip</FieldLabel>
@@ -441,35 +508,24 @@ export default function ReviewScreen() {
                 </View>
               </View>
             </View>
-          </View>
 
-          {/* Extra charges */}
-          {extraCharges.length > 0 && (
-            <Card padding={0} radius={10} row={false} style={[s.card, { marginTop: 16 }]}>
-              {extraCharges.map((charge, i) => (
-                <View key={charge.id}>
-                  {i > 0 && <Divider style={s.divider} />}
-                  <ExtraChargeRow charge={charge} />
-                </View>
-              ))}
-            </Card>
-          )}
-          <View style={[s.ttRow, { marginTop: extraCharges.length > 0 ? 8 : 16 }]}>
-            <View style={s.ttCol1}>
-              <Button
-                variant="filterWide" size="small" label="Add charge"
-                icon={<PlusCircleIcon color={C.text} size={14} />}
-                onPress={() => { lightHaptic(); setChargeModalDiscount(false); setChargeModalVisible(true); }}
-                style={{ width: '100%' }}
-              />
-            </View>
-            <View style={s.ttCol2}>
-              <Button
-                variant="filterWide" size="small" label="Add discount"
-                icon={<MinusCircleIcon color={C.text} size={14} />}
-                onPress={() => { lightHaptic(); setChargeModalDiscount(true); setChargeModalVisible(true); }}
-                style={{ width: '100%' }}
-              />
+            <View style={s.ttRow}>
+              <View style={s.ttCol1}>
+                <Button
+                  variant="filterWide" size="small" label="Add charge"
+                  icon={<PlusCircleIcon color={C.text} size={14} />}
+                  onPress={() => { lightHaptic(); setChargeModalDiscount(false); setChargeModalVisible(true); }}
+                  style={{ width: '100%' }}
+                />
+              </View>
+              <View style={s.ttCol2}>
+                <Button
+                  variant="filterWide" size="small" label="Add discount"
+                  icon={<MinusCircleIcon color={C.text} size={14} />}
+                  onPress={() => { lightHaptic(); setChargeModalDiscount(true); setChargeModalVisible(true); }}
+                  style={{ width: '100%' }}
+                />
+              </View>
             </View>
           </View>
 
@@ -492,7 +548,7 @@ export default function ReviewScreen() {
           </View>
 
           <View style={{ height: 8 }} />
-        </ScrollView>
+        </NestableScrollContainer>
 
         {error ? <Text style={s.errorText}>{error}</Text> : null}
 
@@ -509,16 +565,16 @@ export default function ReviewScreen() {
           <Button
             variant="primary"
             size="big"
-            label="Add Friends"
+            label="Add Rats"
             icon={<FriendsIcon color={C.text} size={18} />}
             onPress={handleNext}
             style={{ flex: 1 }}
           />
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       <ItemModal visible={itemModalVisible} editItem={editItem} onClose={() => setItemModalVisible(false)} />
-      <ChargeModal visible={chargeModalVisible} initialIsDiscount={chargeModalDiscount} onClose={() => setChargeModalVisible(false)} />
+      <ChargeModal visible={chargeModalVisible} initialIsDiscount={chargeModalDiscount} subtotal={subtotal} onClose={() => setChargeModalVisible(false)} />
     </SafeAreaView>
   );
 }
@@ -530,13 +586,12 @@ const s = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 0 },
 
-  sectionLabel: { color: C.textSub, fontSize: 11, fontFamily: 'Poppins_600SemiBold', letterSpacing: 0.8, marginBottom: 6 },
+  sectionLabel: { color: C.textSub, ...Type.fieldLabel, marginBottom: 6 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   addItemBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: C.primaryDim },
-  addItemBtnText: { fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: C.primary },
+  addItemBtnText: { ...Type.pillLabel, color: C.primary },
   addBtn: { borderColor: C.border, borderRadius: 8 },
 
-  card: { overflow: 'hidden' },
   itemList: { gap: 6, paddingBottom: 2 },
 
   // Inline add row
@@ -546,17 +601,17 @@ const s = StyleSheet.create({
     borderRadius: InputMetrics.radius, height: InputMetrics.height, paddingHorizontal: 14,
     backgroundColor: C.card,
   },
-  addNameInput: { flex: 1, minWidth: 0, color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', padding: 0 },
-  addSep: { color: C.textDim, fontSize: 14, fontFamily: 'Poppins_400Regular' },
-  addQtyInput: { width: 28, color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', textAlign: 'center', padding: 0 },
-  addPriceInput: { width: 52, color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', textAlign: 'right', padding: 0 },
+  addNameInput: { flex: 1, minWidth: 0, color: C.text, ...Type.bodySmall, padding: 0 },
+  addSep: { color: C.textDim, ...Type.cardDesc },
+  addQtyInput: { width: 28, color: C.text, ...Type.bodySmall, textAlign: 'center', padding: 0 },
+  addPriceInput: { width: 52, color: C.text, ...Type.bodySmall, textAlign: 'right', padding: 0 },
   addPlusBtn: {
     width: 30, height: 30, borderRadius: 15,
     backgroundColor: C.border, justifyContent: 'center', alignItems: 'center',
   },
   addPlusBtnActive: { backgroundColor: C.primary },
 
-  subLabel: { color: C.text, fontSize: 13, fontFamily: 'Poppins_600SemiBold', marginTop: 10, marginBottom: 6 },
+  subLabel: { color: C.text, ...Type.pillLabel, marginTop: 10, marginBottom: 6 },
 
   // Compact tax/tip rows — fixed 50/50 percentage columns (not flex-grow) so the two
   // columns line up pixel-for-pixel across the Tax/Tip/charge-buttons rows regardless
@@ -566,21 +621,22 @@ const s = StyleSheet.create({
   ttCol2: { width: '50%', paddingLeft: 4 },
   ttBox: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.card, borderRadius: InputMetrics.radius, height: InputMetrics.height, borderWidth: 1.5, borderColor: 'transparent', paddingHorizontal: 10 },
   ttBoxFocused: { borderColor: C.primary },
-  ttPrefix: { color: C.textSub, fontSize: 15, fontFamily: 'Poppins_400Regular' },
-  ttInput: { flex: 1, color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', padding: 0, minWidth: 0 },
+  ttPrefix: { color: C.textSub, ...Type.bodySmall },
+  ttInput: { flex: 1, color: C.text, ...Type.bodySmall, padding: 0, minWidth: 0 },
   ttPreset: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
-  ttPresetActive: { backgroundColor: '#F7D76A' },
-  ttPresetText: { color: C.textSub, fontSize: 12, fontFamily: 'Poppins_600SemiBold' },
+  ttPresetActive: { backgroundColor: C.yellow },
+  ttPresetText: { color: C.textSub, ...Type.pillLabel },
   ttPresetTextActive: { color: C.text },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(0,0,0,0.07)' },
-  emptyText: { color: C.textDim, textAlign: 'center', padding: 20, fontSize: 14, fontFamily: 'Poppins_400Regular' },
+  emptyText: { color: C.textDim, textAlign: 'center', padding: 20, ...Type.cardDesc },
 
   // Item row — each row is its own rounded card so swipe actions aren't clipped
-  itemRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 8, backgroundColor: C.card, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, marginBottom: 6 },
-  itemRowDragging: { borderColor: '#F7D76A' },
-  itemName: { flex: 1, color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular' },
-  itemQty: { color: C.textDim, fontSize: 13, fontFamily: 'Poppins_500Medium' },
-  itemPrice: { color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', minWidth: 52, textAlign: 'right' },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12, gap: 8, backgroundColor: C.card, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, marginBottom: 6 },
+  itemRowDragging: { borderColor: C.yellow },
+  itemName: { flex: 1, color: C.text, ...Type.bodySmall },
+  itemQty: { color: C.textDim, ...Type.labelMedium },
+  itemPrice: { color: C.text, ...Type.bodySmall, minWidth: 52, textAlign: 'right' },
+  itemModifiers: { color: C.textDim, ...Type.caption, marginTop: 3 },
 
   actionWrap: { width: 80, justifyContent: 'center', alignItems: 'center' },
   actionPill: {
@@ -588,23 +644,20 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 4, paddingHorizontal: 8, overflow: 'hidden',
   },
-  actionLabel: { fontSize: 12, fontFamily: 'Poppins_600SemiBold' },
+  actionLabel: { ...Type.pillLabel },
 
-  extraRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: InputMetrics.height, gap: 8 },
-  extraNameInput: { flex: 1, minWidth: 0, color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', padding: 0 },
-  extraAmtInput: { color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', textAlign: 'left', minWidth: 50, padding: 0 },
-  extraDollar: { color: C.textSub, fontSize: 15, fontFamily: 'Poppins_400Regular' },
-  discountMinus: { color: '#4CAF50', fontSize: 16, fontFamily: 'Poppins_700Bold', lineHeight: 20 },
+  chargeHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  chargeNameInput: { flex: 1, minWidth: 0, color: C.textSub, ...Type.fieldLabel, textTransform: 'uppercase', padding: 0 },
 
   totalsDivider: { height: 1, backgroundColor: C.border, marginTop: 28, marginBottom: 16 },
   totalsSection: { paddingBottom: 8 },
 
   // Summary
   sumRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2 },
-  sumLabel: { color: C.textSub, fontSize: 14, fontFamily: 'Poppins_400Regular' },
-  sumValue: { color: C.text, fontSize: 14, fontFamily: 'Poppins_600SemiBold' },
-  totalLabel: { color: C.text, fontSize: 15, fontFamily: 'Poppins_700Bold' },
-  totalBig: { color: C.text, fontFamily: 'Poppins_900Black', fontSize: 28 },
+  sumLabel: { color: C.textSub, ...Type.cardDesc },
+  sumValue: { color: C.text, ...Type.pillLabel },
+  totalLabel: { color: C.text, ...Type.cardTitle },
+  totalBig: { color: C.text, ...Type.h1 },
 
   // Footer
   footer: { padding: 16, paddingTop: 8, flexDirection: 'row', gap: 10 },
@@ -619,7 +672,7 @@ const s = StyleSheet.create({
   // Modals
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modalCard: { backgroundColor: C.bg, borderRadius: 20, padding: 24, width: '100%', maxWidth: 400, gap: 12 },
-  modalTitle: { color: C.text, fontFamily: 'Poppins_900Black', fontSize: 22, letterSpacing: 0.5 },
+  modalTitle: { color: C.text, ...Type.h2, letterSpacing: 0.5 },
   modalLabel: { color: C.textSub, fontSize: 11, fontFamily: 'Poppins_500Medium', marginBottom: 6 },
   modalInput: {},
   modalInputFocused: { borderColor: C.primary },

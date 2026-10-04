@@ -3,21 +3,23 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal, Platform, Pressable, ScrollView,
-  StyleSheet, TextInput, View,
+  StyleSheet, View,
 } from 'react-native';
 import { ActionPill } from '@/components/ActionPill';
 import { Avatar } from '@/components/Avatar';
-import { BillTypeIcon, CalendarIcon, CheckCircleIcon, CircleIcon, CloseCircleIcon, HomeTypeIcon, PlusIcon, ProgressIcon, ReopenIcon, SearchIcon, SortIcon, TrashIcon, TripTypeIcon } from '@/components/FigmaIcons';
-import { Button, Card, CircleIconButton, ConfirmModal, DatePickerModal, EditableTitle, FieldLabel, IconBadge, SectionLabel } from '@/components/design';
+import { BillTypeIcon, CalendarIcon, CheckCircleIcon, CircleIcon, CloseCircleIcon, EmptyStateIcon, HomeTypeIcon, PlusIcon, ProgressIcon, ReopenIcon, TrashIcon, TripTypeIcon } from '@/components/FigmaIcons';
+import { Button, Card, CircleIconButton, ConfirmModal, DatePickerModal, DateRangeCalendarModal, EditableTitle, FieldLabel, IconBadge, SearchInput, SectionLabel } from '@/components/design';
+import { JoinCodeModal } from '@/components/JoinCodeModal';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { C } from '@/constants/colors';
 import { Badge, InputMetrics, Radius } from '@/constants/spacing';
+import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import { fmt } from '@/utils/calculator';
-import { fmtDate, fmtMonthYear, parseLocalDate } from '@/utils/date';
+import { fmtDate, fmtDateRange, fmtMonthYear, parseLocalDate } from '@/utils/date';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import type { SplitRecord, Trip } from '@/types';
 
@@ -132,13 +134,25 @@ function QuickEditModal({ item, onClose }: { item: SplitRecord; onClose: () => v
             )}
           </View>
 
-          {/* Per-person payment */}
+          {/* Per-person payment — the payer themselves is shown too (as a plain "paid the bill"
+              row, not a toggle) so the list always reflects everyone, not just who still owes. */}
           {people.length > 0 && (
             <View>
               <FieldLabel style={{ marginTop: 2 }}>WHO'S PAID</FieldLabel>
               <View style={{ gap: 12 }}>
                 {people.map((person, i) => {
-                  if (person.id === paidById) return null;
+                  if (person.id === paidById) {
+                    return (
+                      <View key={person.id} style={qst.personRow}>
+                        <Avatar name={person.name} index={i} size={Badge.avatarSize} />
+                        <Text style={qst.personName} numberOfLines={1}>{person.name}</Text>
+                        <View style={st.paidAmountRow}>
+                          <CheckCircleIcon color={C.success} size={13} />
+                          <Text style={st.paidAmountText}>Paid the bill</Text>
+                        </View>
+                      </View>
+                    );
+                  }
                   const status = statuses.find((s) => s.personId === person.id);
                   const paid = status?.paid ?? false;
                   const amount = amounts.find((a) => a.name === person.name)?.amount ?? 0;
@@ -224,12 +238,9 @@ function TripQuickModal({ trip, onClose }: { trip: Trip; onClose: () => void }) 
   const tabs = history.filter((r) => r.tripId === trip.id);
 
   const [name, setName] = useState(live.name);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [dateModalOpen, setDateModalOpen] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const parsedStart = (() => { const d = new Date(live.startDate); return isNaN(d.getTime()) ? new Date() : d; })();
-  const parsedEnd = (() => { const d = new Date(live.endDate ?? ''); return isNaN(d.getTime()) ? new Date() : d; })();
 
   const flash = () => {
     setSavedFlash(true);
@@ -243,12 +254,8 @@ function TripQuickModal({ trip, onClose }: { trip: Trip; onClose: () => void }) 
     updateTrip(trip.id, v, live.emoji, live.startDate, live.endDate, live.people, live.currency, live.currencies, live.budget, live.groupBudget);
     flash();
   };
-  const commitStartDate = (v: string) => {
-    updateTrip(trip.id, name, live.emoji, v, live.endDate, live.people, live.currency, live.currencies, live.budget, live.groupBudget);
-    flash();
-  };
-  const commitEndDate = (v: string) => {
-    updateTrip(trip.id, name, live.emoji, live.startDate, v, live.people, live.currency, live.currencies, live.budget, live.groupBudget);
+  const commitDates = (start: string, end: string) => {
+    updateTrip(trip.id, name, live.emoji, start, end, live.people, live.currency, live.currencies, live.budget, live.groupBudget);
     flash();
   };
 
@@ -263,35 +270,12 @@ function TripQuickModal({ trip, onClose }: { trip: Trip; onClose: () => void }) 
 
           <View>
             <FieldLabel>DATES</FieldLabel>
-            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              {Platform.OS === 'web' ? (
-                <View style={[qst.datePillWrap, { flex: 1, position: 'relative' }]}>
-                  <CalendarIcon size={15} color={C.text} />
-                  <Text style={[qst.datePillText, !live.startDate && { color: C.textDim }]}>{live.startDate || 'Start date'}</Text>
-                  {createElement('input', { type: 'date', value: toInputDate(live.startDate), onChange: (e: any) => commitStartDate(fromInputDate(e.target.value)), style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0, cursor: 'pointer', border: 'none', outline: 'none' } as any })}
-                </View>
-              ) : (
-                <PressBtn style={[qst.datePillWrap, { flex: 1 }]} onPress={() => setShowStartPicker(true)} activeOpacity={0.8}>
-                  <CalendarIcon size={15} color={C.text} />
-                  <Text style={[qst.datePillText, !live.startDate && { color: C.textDim }]}>{live.startDate || 'Start date'}</Text>
-                </PressBtn>
-              )}
-              <View style={{ transform: [{ rotate: '90deg' }] }}>
-                <SortIcon size={13} color={C.textDim} />
-              </View>
-              {Platform.OS === 'web' ? (
-                <View style={[qst.datePillWrap, { flex: 1, position: 'relative' }]}>
-                  <CalendarIcon size={15} color={C.text} />
-                  <Text style={[qst.datePillText, !live.endDate && { color: C.textDim }]}>{live.endDate || 'End date'}</Text>
-                  {createElement('input', { type: 'date', value: toInputDate(live.endDate ?? ''), onChange: (e: any) => commitEndDate(fromInputDate(e.target.value)), style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0, cursor: 'pointer', border: 'none', outline: 'none' } as any })}
-                </View>
-              ) : (
-                <PressBtn style={[qst.datePillWrap, { flex: 1 }]} onPress={() => setShowEndPicker(true)} activeOpacity={0.8}>
-                  <CalendarIcon size={15} color={C.text} />
-                  <Text style={[qst.datePillText, !live.endDate && { color: C.textDim }]}>{live.endDate || 'End date'}</Text>
-                </PressBtn>
-              )}
-            </View>
+            <PressBtn style={qst.datePillWrap} onPress={() => setDateModalOpen(true)} activeOpacity={0.8}>
+              <CalendarIcon size={15} color={C.text} />
+              <Text style={[qst.datePillText, !live.startDate && { color: C.textDim }]} numberOfLines={1}>
+                {live.startDate ? fmtDateRange(live.startDate, live.endDate) : 'Choose date(s)'}
+              </Text>
+            </PressBtn>
           </View>
 
           {tabs.length > 0 && (
@@ -323,24 +307,13 @@ function TripQuickModal({ trip, onClose }: { trip: Trip; onClose: () => void }) 
             )}
           </View>
 
-          {!!DateTimePicker && (
-            <>
-              <DatePickerModal
-                visible={showStartPicker}
-                value={parsedStart}
-                onChange={(d) => commitStartDate(fmtDate(d))}
-                onClose={() => setShowStartPicker(false)}
-                title="Start date"
-              />
-              <DatePickerModal
-                visible={showEndPicker}
-                value={parsedEnd}
-                onChange={(d) => commitEndDate(fmtDate(d))}
-                onClose={() => setShowEndPicker(false)}
-                title="End date"
-              />
-            </>
-          )}
+          <DateRangeCalendarModal
+            visible={dateModalOpen}
+            startDate={live.startDate}
+            endDate={live.endDate}
+            onConfirm={(s, e) => { commitDates(s, e); setDateModalOpen(false); }}
+            onClose={() => setDateModalOpen(false)}
+          />
         </Pressable>
       </Pressable>
     </Modal>
@@ -614,6 +587,7 @@ export default function FeedScreen() {
   const [quickEditTrip, setQuickEditTrip] = useState<Trip | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<Filter>('all');
+  const [joinVisible, setJoinVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   useFocusEffect(useCallback(() => {
@@ -745,42 +719,57 @@ export default function FeedScreen() {
       {/* Fixed header */}
       <View style={st.header}>
         <View style={st.headerRow}>
-          <Text style={st.headerTitle}>Open tab</Text>
-          <Button variant="secondary" size="small" icon={<PlusIcon color={C.text} size={14} />} label="Join tab" />
+          <Text style={st.headerTitle}>Feed</Text>
+          <Button
+            variant="secondary" size="small"
+            icon={<PlusIcon color={C.text} size={14} />}
+            label="Join tab"
+            onPress={() => { selectionHaptic(); setJoinVisible(true); }}
+          />
         </View>
       </View>
       <View style={st.searchRow}>
-        <View style={st.searchBox}>
-          <SearchIcon color={C.text} size={16} style={{ marginLeft: 14 }} />
-          <TextInput
-            style={st.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search"
-            placeholderTextColor={C.textDim}
-          />
-          {searchQuery.length > 0 && (
-            <PressBtn onPress={() => setSearchQuery('')} hitSlop={8} style={{ paddingHorizontal: 14 }}>
+        <SearchInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search"
+          trailing={searchQuery.length > 0 && (
+            <PressBtn onPress={() => setSearchQuery('')} hitSlop={8} style={{ paddingHorizontal: 6 }}>
               <CloseCircleIcon size={15} color={C.textDim} />
             </PressBtn>
           )}
+        />
+      </View>
+
+      {/* Filter pills — nothing to filter on an empty list */}
+      {hasAnything && (
+        <View style={st.filterRow}>
+          {FILTERS.map((f) => (
+            <Button
+              key={f.id}
+              variant="filter"
+              size="small"
+              active={activeFilter === f.id}
+              label={f.label}
+              onPress={() => { selectionHaptic(); setActiveFilter(f.id); }}
+            />
+          ))}
         </View>
-      </View>
+      )}
 
-      {/* Filter pills */}
-      <View style={st.filterRow}>
-        {FILTERS.map((f) => (
-          <Button
-            key={f.id}
-            variant="filter"
-            size="small"
-            active={activeFilter === f.id}
-            label={f.label}
-            onPress={() => { selectionHaptic(); setActiveFilter(f.id); }}
-          />
-        ))}
-      </View>
-
+      {/* Empty state is a plain flex:1-centered sibling, not nested inside the ScrollView below
+          — matching Trips' structure exactly. Trying to reserve/compensate for the ScrollView's
+          other siblings (filter row, trailing spacer) with matching invisible spacers turned into
+          an unstable game of whack-a-mole, since flex centering redistributes any height change
+          non-obviously (removing space from one side shifts the center the OPPOSITE way you'd
+          expect). Isolating it outside the ScrollView entirely sidesteps that class of bug. */}
+      {!hasAnything ? (
+        <View style={st.empty}>
+          <EmptyStateIcon size={52} />
+          <Text style={st.emptyTitle}>Nothing here yet</Text>
+          <Text style={st.emptyText}>Tap + to split a bill, start a trip, or set up a home</Text>
+        </View>
+      ) : (
       <ScrollView
         ref={scrollRef}
         style={st.scroll}
@@ -858,17 +847,10 @@ export default function FeedScreen() {
           </View>
         )}
 
-        {/* Empty state */}
-        {!hasAnything && (
-          <View style={st.empty}>
-            <Text style={{ fontSize: 52 }}>??</Text>
-            <Text style={st.emptyTitle}>Nothing here yet</Text>
-            <Text style={st.emptyText}>Tap + to split a bill, start a trip, or set up a home</Text>
-          </View>
-        )}
-
+        {/* Bottom breathing room below the last list item */}
         <View style={{ height: 24 }} />
       </ScrollView>
+      )}
 
       {/* Delete confirmation */}
       <ConfirmModal
@@ -923,6 +905,8 @@ export default function FeedScreen() {
 
       {quickEdit && <QuickEditModal item={quickEdit} onClose={() => setQuickEdit(null)} />}
       {quickEditTrip && <TripQuickModal trip={quickEditTrip} onClose={() => setQuickEditTrip(null)} />}
+
+      <JoinCodeModal visible={joinVisible} onClose={() => setJoinVisible(false)} />
     </SafeAreaView>
   );
 }
@@ -936,16 +920,16 @@ const qst = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: C.primaryDim, borderRadius: InputMetrics.radius, height: InputMetrics.height, paddingHorizontal: 12,
   },
-  datePillText: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.text },
+  datePillText: { ...Type.labelMedium, color: C.text },
   personRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 9, paddingHorizontal: 12, borderRadius: 12,
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
   },
-  personName: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
-  personAmt: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  personName: { flex: 1, ...Type.labelMedium, color: C.text },
+  personAmt: { ...Type.cardTitle, color: C.text },
   savedRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 18 },
-  savedText: { fontFamily: 'Poppins_500Medium', fontSize: 12, color: C.success },
+  savedText: { ...Type.labelMedium, color: C.success },
 });
 
 const st = StyleSheet.create({
@@ -954,35 +938,38 @@ const st = StyleSheet.create({
   header: { backgroundColor: 'transparent', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
   searchRow: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: 'transparent' },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { fontFamily: 'Poppins_900Black', fontSize: 30, color: '#000000' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: InputMetrics.radius, height: InputMetrics.height, overflow: 'hidden' },
-  searchInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text, height: '100%', textAlignVertical: 'center', paddingHorizontal: 10 },
+  headerTitle: { ...Type.display, color: '#000000' },
 
   filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: 'transparent' },
 
   scroll: { flex: 1 },
-  scrollContent: { paddingTop: 16, paddingBottom: 32 },
+  scrollContent: { paddingTop: 16, paddingBottom: 32, flexGrow: 1 },
 
   section: { paddingHorizontal: 16, paddingBottom: 16 },
 
-  dateGroupLabel: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.textSub, marginBottom: 6, marginTop: 4 },
+  dateGroupLabel: { ...Type.sectionLabel, color: C.textSub, marginBottom: 6, marginTop: 4 },
   feedList: { gap: 8 },
   feedCardClosed: { opacity: 0.5 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  feedTitle: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  feedTitle: { ...Type.cardTitle, color: C.text },
   closedTitle: { color: C.textDim },
-  feedDesc: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: -2 },
-  feedTotal: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  feedDesc: { ...Type.cardDesc, color: C.textSub, marginTop: -2 },
+  feedTotal: { ...Type.cardTitle, color: C.text },
 
   paidAmountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  paidAmountText: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.textSub, textDecorationLine: 'line-through' },
+  paidAmountText: { ...Type.cardTitle, color: C.textSub, textDecorationLine: 'line-through' },
 
   payLine: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  payLineText: { fontFamily: 'Poppins_400Regular', fontSize: 11, color: C.textDim },
+  payLineText: { ...Type.cardDesc, color: C.textDim },
 
-  noResults: { textAlign: 'center', paddingVertical: 20, fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textDim },
+  noResults: { textAlign: 'center', paddingVertical: 20, ...Type.bodySmall, color: C.textDim },
 
-  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyTitle: { fontFamily: 'Poppins_900Black', fontSize: 26, color: C.text },
-  emptyText: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textSub, textAlign: 'center', paddingHorizontal: 40 },
+  // Matches Trips'/Homes' empty state exactly — relies on scrollContent's flexGrow: 1 above so
+  // it can center within the full screen height, not just the ScrollView's content height.
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 12 },
+  emptyTitle: { ...Type.emptyTitle, color: C.text },
+  // minHeight reserves space for the longest of the three tabs' empty-state copy (Homes', 3
+  // lines) so a shorter description here doesn't shrink the centered block and shift the icon
+  // up relative to Trips'/Homes' — same fixed height on all three keeps the icon's Y identical.
+  emptyText: { ...Type.bodySmall, color: C.textSub, textAlign: 'center', lineHeight: 24, minHeight: 66 },
 });

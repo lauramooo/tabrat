@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { Button, CenteredModal, Input } from '@/components/design';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { FlowSteps, ReceiptHeader } from '@/components/FlowSteps';
 import { useSplitStore } from '@/store/useSplitStore';
@@ -58,7 +59,7 @@ function ItemRow({ item, onEdit }: { item: ItemData; onEdit: (i: ItemData) => vo
     >
       <View style={s.itemRow}>
         <Text style={s.itemName} numberOfLines={1}>{item.name}</Text>
-        <Text style={s.itemQty}>�{item.quantity}</Text>
+        <Text style={s.itemQty}>×{item.quantity}</Text>
         <Text style={s.itemPrice}>{fmt(item.price)}</Text>
       </View>
     </Swipeable>
@@ -82,7 +83,7 @@ function InlineAddRow({ onAdd }: { onAdd: (name: string, price: number, qty: num
     <View style={s.addRow}>
       <TextInput style={s.addNameInput} placeholder="Item" placeholderTextColor={C.textDim}
         value={name} onChangeText={setName} returnKeyType="next" />
-      <Text style={s.addSep}>�</Text>
+      <Text style={s.addSep}>×</Text>
       <TextInput style={s.addQtyInput} value={qty} onChangeText={(v) => setQty(sanitizeNumberInput(v))}
         keyboardType="number-pad" selectTextOnFocus />
       <Text style={s.addSep}>$</Text>
@@ -295,9 +296,9 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 18, paddingTop: 10, paddingBottom: 6, gap: 10,
   },
-  titleText: { color: C.text, fontFamily: 'Poppins_900Black', fontSize: 28, letterSpacing: 0.5 },
+  titleText: { color: C.text, ...Type.h1, letterSpacing: 0.5 },
   titleInput: {
-    color: C.text, fontFamily: 'Poppins_900Black', fontSize: 28, letterSpacing: 0.5,
+    color: C.text, ...Type.h1, letterSpacing: 0.5,
     padding: 0, borderBottomWidth: 2, borderBottomColor: C.primary, paddingBottom: 2,
   },
 
@@ -311,21 +312,21 @@ const s = StyleSheet.create({
     backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
   },
   catChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  catChipText: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.textSub },
+  catChipText: { ...Type.labelMedium, color: C.textSub },
   catChipTextActive: { color: '#fff' },
   catChipAdd: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
     borderWidth: 1, borderColor: C.textDim, borderStyle: 'dashed',
   },
-  catChipAddText: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.textSub },
+  catChipAddText: { ...Type.labelMedium, color: C.textSub },
   newCatRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: C.card, borderRadius: 999, borderWidth: 1, borderColor: C.primary,
     paddingHorizontal: 12, paddingVertical: 4,
   },
   newCatInput: {
-    fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text,
+    ...Type.bodySmall, color: C.text,
     minWidth: 100, padding: 0,
   },
   newCatConfirm: { padding: 2 },
@@ -333,27 +334,27 @@ const s = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
   sectionLabel: {
-    color: C.textSub, fontSize: 11, fontFamily: 'Poppins_600SemiBold',
-    letterSpacing: 0.8, marginBottom: 6,
+    color: C.textSub, ...Type.fieldLabel,
+    marginBottom: 6,
   },
   itemList: { gap: 6 },
   itemRow: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12,
     gap: 6, backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border,
   },
-  itemName: { flex: 1, color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular' },
-  itemQty: { color: C.textDim, fontSize: 13, fontFamily: 'Poppins_500Medium', marginRight: 4 },
-  itemPrice: { color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', minWidth: 52, textAlign: 'right' },
+  itemName: { flex: 1, color: C.text, ...Type.bodySmall },
+  itemQty: { color: C.textDim, ...Type.labelMedium, marginRight: 4 },
+  itemPrice: { color: C.text, ...Type.bodySmall, minWidth: 52, textAlign: 'right' },
 
   addRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     borderWidth: 1.5, borderColor: C.border, borderStyle: 'dashed',
     borderRadius: InputMetrics.radius, paddingHorizontal: 14, height: InputMetrics.height, backgroundColor: C.card,
   },
-  addNameInput: { flex: 1, minWidth: 0, color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', padding: 0 },
+  addNameInput: { flex: 1, minWidth: 0, color: C.text, ...Type.bodySmall, padding: 0 },
   addSep: { color: C.textDim, fontSize: 14 },
-  addQtyInput: { width: 28, color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', textAlign: 'center', padding: 0 },
-  addPriceInput: { width: 52, color: C.text, fontSize: 15, fontFamily: 'Poppins_400Regular', textAlign: 'right', padding: 0 },
+  addQtyInput: { width: 28, color: C.text, ...Type.bodySmall, textAlign: 'center', padding: 0 },
+  addPriceInput: { width: 52, color: C.text, ...Type.bodySmall, textAlign: 'right', padding: 0 },
   addPlusBtn: {
     width: 30, height: 30, borderRadius: 15,
     backgroundColor: C.border, justifyContent: 'center', alignItems: 'center',
@@ -365,15 +366,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14, marginTop: 12,
     borderTopWidth: 1, borderTopColor: C.border,
   },
-  subtotalLabel: { color: C.text, fontSize: 15, fontFamily: 'Poppins_700Bold' },
-  subtotalAmt: { color: C.text, fontFamily: 'Poppins_900Black', fontSize: 28 },
+  subtotalLabel: { color: C.text, ...Type.cardTitle },
+  subtotalAmt: { color: C.text, ...Type.h1 },
 
   actionWrap: { width: 80, justifyContent: 'center', alignItems: 'center' },
   actionPill: {
     height: 36, borderRadius: 18, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center', gap: 4, paddingHorizontal: 8, overflow: 'hidden',
   },
-  actionLabel: { fontSize: 12, fontFamily: 'Poppins_600SemiBold' },
+  actionLabel: { ...Type.pillLabel },
 
   footer: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -384,9 +385,9 @@ const s = StyleSheet.create({
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modalCard: { backgroundColor: C.bg, borderRadius: 20, padding: 24, width: '100%', maxWidth: 400, gap: 12 },
-  modalTitle: { color: C.text, fontFamily: 'Poppins_900Black', fontSize: 22, letterSpacing: 0.5 },
+  modalTitle: { color: C.text, ...Type.h2, letterSpacing: 0.5 },
   modalLabel: { color: C.textSub, fontSize: 11, fontFamily: 'Poppins_500Medium', marginBottom: 6 },
   modalInput: {},
-  modalSubtotal: { color: C.textSub, fontSize: 13, textAlign: 'right', fontFamily: 'Poppins_400Regular' },
+  modalSubtotal: { color: C.textSub, ...Type.cardDesc, textAlign: 'right' },
   modalBtns: { flexDirection: 'row', gap: 10, marginTop: 4, justifyContent: 'flex-end' },
 });

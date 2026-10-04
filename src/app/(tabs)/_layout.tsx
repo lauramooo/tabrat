@@ -8,6 +8,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BillTypeIcon, FeedIcon, HomeTypeIcon, PlusIcon, ProfileIcon, TripTypeIcon } from '@/components/FigmaIcons';
 import { Card, CenteredModal, IconBadge } from '@/components/design';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
 import { mediumHaptic, selectionHaptic } from '@/utils/haptics';
 
@@ -86,13 +87,13 @@ function CustomTabBar({ state, navigation, onFabPress }: BottomTabBarProps & { o
   const insets = useSafeAreaInsets();
   return (
     <View style={s.tabBarWrap}>
-      <View style={[s.tabBar, { marginBottom: Math.max(insets.bottom, 0) + 10 }]}>
+      <View style={[s.tabBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         {SLOTS.map((routeIdx, slotIdx) => {
           if (routeIdx === null) {
             return (
               <View key="fab" style={s.fabSlot}>
                 <PressBtn style={s.fabBtn} onPress={() => onFabPress(state.index)} activeOpacity={0.85}>
-                  <PlusIcon color="white" size={18} />
+                  <PlusIcon color={C.white} size={18} />
                 </PressBtn>
               </View>
             );
@@ -112,7 +113,7 @@ function CustomTabBar({ state, navigation, onFabPress }: BottomTabBarProps & { o
               }}
             >
               <View style={s.tabBtnInner}>
-                <TabIcon name={tab.figmaIcon} color={focused ? C.text : C.textDim} size={20} />
+                <TabIcon name={tab.figmaIcon} color={focused ? C.text : C.textDim} size={22} />
                 <Text style={[s.tabLabel, focused && s.tabLabelActive]}>{tab.label}</Text>
                 {focused && <View style={s.tabIndicator} />}
               </View>
@@ -157,40 +158,38 @@ export default function TabsLayout() {
 }
 
 const s = StyleSheet.create({
-  sheetTitle: { fontFamily: 'Poppins_900Black', fontSize: 22, color: C.text },
+  sheetTitle: { ...Type.h2, color: C.text },
   actionRow: {
     gap: 14, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14,
   },
-  actionLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 16, color: C.text },
-  actionDesc: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: 2 },
+  actionLabel: { ...Type.buttonLg, color: C.text },
+  actionDesc: { ...Type.cardDesc, color: C.textSub, marginTop: 2 },
 
-  tabBarWrap: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16 },
+  tabBarWrap: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  // Flush against the bottom edge (no floating margin/pill shape). Background stays the
+  // same light card color as the rest of the UI, but a top border + upward shadow keep it
+  // visually separated from the cream page background instead of blending into it.
   tabBar: {
     flexDirection: 'row',
     backgroundColor: C.card,
-    borderRadius: 999,
-    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    paddingTop: 10,
     paddingHorizontal: 6,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.10,
-    shadowRadius: 20,
+    boxShadow: '0px -4px 12px rgba(0,0,0,0.06)',
     elevation: 10,
   },
   tabBtn: { flex: 1, alignItems: 'stretch', paddingHorizontal: 4 },
   tabBtnInner: { alignItems: 'center', gap: 2, paddingVertical: 5 },
   tabIndicator: { width: 16, height: 2.5, borderRadius: 999, backgroundColor: C.text, marginTop: 2 },
-  tabLabel: { fontFamily: 'Poppins_500Medium', fontSize: 10, color: C.textDim },
+  tabLabel: { ...Type.caption, color: C.textDim },
   tabLabelActive: { color: C.text },
   fabSlot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   fabBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#000000',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: C.text,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
+    boxShadow: '0px 4px 10px rgba(0,0,0,0.25)',
     elevation: 8,
   },
 });

@@ -3,6 +3,12 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ExtraCharge, Group, Home, OpenClosedStatus, ParsedReceipt, Payer, PaymentStatus, Person, ReceiptItem, SplitRecord, Trip } from '@/types';
 import { fmtDate } from '@/utils/date';
+import { generateJoinCode } from '@/utils/joinCode';
+import {
+  syncDeleteFriend, syncDeleteGroup, syncDeleteHome, syncDeleteHomePaymentsFor, syncDeleteSplitRecord,
+  syncDeleteTrip, syncDeleteTripPaymentsFor, syncProfileCategories, syncUpsertFriend, syncUpsertGroup,
+  syncUpsertHome, syncUpsertHomePayment, syncUpsertSplitRecord, syncUpsertTrip, syncUpsertTripPayment,
+} from '@/lib/sync';
 
 const DEFAULT_EXPENSE_CATEGORIES = ['Hotel', 'Food & Drinks', 'Transport', 'Activities', 'Shopping', 'Other'];
 const DEFAULT_HOME_EXPENSE_CATEGORIES = ['Rent', 'Electric', 'Gas', 'Water', 'Internet', 'Groceries', 'Cleaning', 'Subscriptions', 'Other'];
@@ -190,10 +196,17 @@ export const useSplitStore = create<SplitState>()(
           price: i.price,
           quantity: i.quantity ?? 1,
           assignedTo: [],
+          ...(i.modifiers?.length ? { modifiers: i.modifiers } : {}),
+        }));
+        const extraCharges: ExtraCharge[] = (data.extraCharges ?? []).map((c) => ({
+          id: uid(),
+          name: c.name,
+          amount: c.amount,
+          ...(c.isDiscount ? { isDiscount: true } : {}),
         }));
         set({
           items,
-          extraCharges: [],
+          extraCharges,
           restaurantName: data.restaurantName ?? '',
           receiptDate: data.receiptDate ? (fmtDate(data.receiptDate) || data.receiptDate) : '',
           subtotal: data.subtotal,
@@ -220,10 +233,12 @@ export const useSplitStore = create<SplitState>()(
           items: s.items.map((item) => (item.id === id ? { ...item, category } : item)),
         })),
 
-      addItemCategory: (cat) =>
+      addItemCategory: (cat) => {
         set((s) => ({
           itemCategories: s.itemCategories.includes(cat) ? s.itemCategories : [...s.itemCategories, cat],
-        })),
+        }));
+        syncProfileCategories({ itemCategories: get().itemCategories });
+      },
 
       removeItem: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
 
@@ -367,7 +382,10 @@ export const useSplitStore = create<SplitState>()(
         })),
 
       setCurrency: (currency) => set({ currency }),
-      setDefaultCurrency: (currency) => set({ defaultCurrency: currency }),
+      setDefaultCurrency: (currency) => {
+        set({ defaultCurrency: currency });
+        syncProfileCategories({ defaultCurrency: currency });
+      },
 
       reset: () => set({ ...initial, receiptDate: fmtDate(new Date()) }),
 
@@ -420,28 +438,41 @@ export const useSplitStore = create<SplitState>()(
           payers: payers.length > 0 ? payers : (paidBy ? [{ personId: paidBy, amount: total }] : undefined),
           paymentStatuses: people.map((p) => ({ personId: p.id, paid: false, amountPaid: 0 })),
           source: 'scan',
+          joinCode: (!activeTripId && !activeHomeId) ? generateJoinCode() : undefined,
         };
         set((s) => ({ history: [record, ...s.history].slice(0, 50), splitSaved: true, savedSplitId: record.id }));
+        syncUpsertSplitRecord(record);
       },
 
       clearHistory: () => set({ history: [] }),
 
-      deleteHistory: (id) => set((s) => ({ history: s.history.filter((r) => r.id !== id) })),
+      deleteHistory: (id) => {
+        set((s) => ({ history: s.history.filter((r) => r.id !== id) }));
+        syncDeleteSplitRecord(id);
+      },
 
       updateRecord: (id, patch) => {
         const normalizedPatch = patch.receiptDate
           ? { ...patch, receiptDate: fmtDate(patch.receiptDate) || patch.receiptDate }
           : patch;
         set((s) => ({ history: s.history.map((r) => r.id === id ? { ...r, ...normalizedPatch } : r) }));
+        const updated = get().history.find((r) => r.id === id);
+        if (updated) syncUpsertSplitRecord(updated);
       },
 
-      closeTab: (id) =>
-        set((s) => ({ history: s.history.map((r) => (r.id === id ? { ...r, status: 'closed' } : r)) })),
+      closeTab: (id) => {
+        set((s) => ({ history: s.history.map((r) => (r.id === id ? { ...r, status: 'closed' } : r)) }));
+        const updated = get().history.find((r) => r.id === id);
+        if (updated) syncUpsertSplitRecord(updated);
+      },
 
-      reopenTab: (id) =>
-        set((s) => ({ history: s.history.map((r) => (r.id === id ? { ...r, status: 'open' } : r)) })),
+      reopenTab: (id) => {
+        set((s) => ({ history: s.history.map((r) => (r.id === id ? { ...r, status: 'open' } : r)) }));
+        const updated = get().history.find((r) => r.id === id);
+        if (updated) syncUpsertSplitRecord(updated);
+      },
 
-      setPersonPaid: (tabId, personId, paid, amountPaid = 0) =>
+      setPersonPaid: (tabId, personId, paid, amountPaid = 0) => {
         set((s) => ({
           history: s.history.map((r) => {
             if (r.id !== tabId) return r;
@@ -456,32 +487,51 @@ export const useSplitStore = create<SplitState>()(
             const allPaid = nonPayerStatuses.length > 0 && nonPayerStatuses.every((ps) => ps.paid);
             return { ...r, paymentStatuses, status: allPaid ? 'closed' : r.status };
           }),
-        })),
+        }));
+        const updated = get().history.find((r) => r.id === tabId);
+        if (updated) syncUpsertSplitRecord(updated);
+      },
 
       addHome: (name, emoji, members, currency = DEFAULT_CURRENCY) => {
         const id = uid();
-        set((s) => ({
-          homes: [{ id, name, emoji, members, createdAt: new Date().toISOString(), currency }, ...s.homes],
-        }));
+        const home: Home = { id, name, emoji, members, createdAt: new Date().toISOString(), currency, joinCode: generateJoinCode() };
+        set((s) => ({ homes: [home, ...s.homes] }));
+        syncUpsertHome(home);
         return id;
       },
 
-      updateHome: (id, name, emoji, members, startDate, endDate) =>
+      updateHome: (id, name, emoji, members, startDate, endDate) => {
         set((s) => ({
           homes: s.homes.map((h) => h.id === id
             ? { ...h, name, emoji, members, ...(startDate !== undefined && { createdAt: startDate }), endDate }
             : h),
-        })),
+        }));
+        const updated = get().homes.find((h) => h.id === id);
+        if (updated) syncUpsertHome(updated);
+      },
 
-      deleteHome: (id) =>
+      deleteHome: (id) => {
+        const removedRecordIds = get().history.filter((r) => r.homeId === id).map((r) => r.id);
         set((s) => ({
           homes: s.homes.filter((h) => h.id !== id),
           history: s.history.filter((r) => r.homeId !== id),
           homePayments: (s.homePayments ?? []).filter((p) => p.homeId !== id),
-        })),
+        }));
+        syncDeleteHome(id);
+        removedRecordIds.forEach(syncDeleteSplitRecord);
+        syncDeleteHomePaymentsFor(id);
+      },
 
-      closeHome: (id) => set((s) => ({ homes: s.homes.map((h) => (h.id === id ? { ...h, status: 'closed' } : h)) })),
-      reopenHome: (id) => set((s) => ({ homes: s.homes.map((h) => (h.id === id ? { ...h, status: 'open' } : h)) })),
+      closeHome: (id) => {
+        set((s) => ({ homes: s.homes.map((h) => (h.id === id ? { ...h, status: 'closed' } : h)) }));
+        const updated = get().homes.find((h) => h.id === id);
+        if (updated) syncUpsertHome(updated);
+      },
+      reopenHome: (id) => {
+        set((s) => ({ homes: s.homes.map((h) => (h.id === id ? { ...h, status: 'open' } : h)) }));
+        const updated = get().homes.find((h) => h.id === id);
+        if (updated) syncUpsertHome(updated);
+      },
 
       saveHomeExpenseDirectly: ({ name, receiptDate, category, amount, participants, paidByName, homeId }) => {
         const n = participants.length || 1;
@@ -511,85 +561,131 @@ export const useSplitStore = create<SplitState>()(
           source: 'manual',
         };
         set((s) => ({ history: [record, ...s.history].slice(0, 50) }));
+        syncUpsertSplitRecord(record);
       },
 
-      addFriend: (name) =>
-        set((s) => ({ friends: [...s.friends, { id: uid(), name: name.trim() }] })),
+      addFriend: (name) => {
+        const friend: Person = { id: uid(), name: name.trim() };
+        set((s) => ({ friends: [...s.friends, friend] }));
+        syncUpsertFriend(friend);
+      },
 
-      removeFriend: (id) =>
-        set((s) => ({ friends: s.friends.filter((f) => f.id !== id) })),
+      removeFriend: (id) => {
+        set((s) => ({ friends: s.friends.filter((f) => f.id !== id) }));
+        syncDeleteFriend(id);
+      },
 
-      updateFriend: (id, name) =>
-        set((s) => ({ friends: s.friends.map((f) => f.id === id ? { ...f, name: name.trim() } : f) })),
+      updateFriend: (id, name) => {
+        set((s) => ({ friends: s.friends.map((f) => f.id === id ? { ...f, name: name.trim() } : f) }));
+        const updated = get().friends.find((f) => f.id === id);
+        if (updated) syncUpsertFriend(updated);
+      },
 
-      addGroup: (name, icon, members) =>
-        set((s) => ({ groups: [...s.groups, { id: uid(), name, icon, members }] })),
+      addGroup: (name, icon, members) => {
+        const group: Group = { id: uid(), name, icon, members };
+        set((s) => ({ groups: [...s.groups, group] }));
+        syncUpsertGroup(group);
+      },
 
-      updateGroup: (id, name, icon, members) =>
+      updateGroup: (id, name, icon, members) => {
         set((s) => ({
           groups: s.groups.map((g) => (g.id === id ? { ...g, name, icon, members } : g)),
-        })),
+        }));
+        const updated = get().groups.find((g) => g.id === id);
+        if (updated) syncUpsertGroup(updated);
+      },
 
-      deleteGroup: (id) => set((s) => ({ groups: s.groups.filter((g) => g.id !== id) })),
+      deleteGroup: (id) => {
+        set((s) => ({ groups: s.groups.filter((g) => g.id !== id) }));
+        syncDeleteGroup(id);
+      },
 
       addTrip: (name, emoji, startDate, people, currency = DEFAULT_CURRENCY, currencies, budget, groupBudget) => {
         const id = uid();
         const currList = currencies && currencies.length > 0 ? currencies : [currency];
-        set((s) => ({
-          trips: [{ id, name, emoji, startDate, createdAt: new Date().toISOString(), people, status: 'open', currency: currList[0], currencies: currList, budget, groupBudget }, ...s.trips],
-        }));
+        const trip: Trip = { id, name, emoji, startDate, createdAt: new Date().toISOString(), people, status: 'open', currency: currList[0], currencies: currList, budget, groupBudget, joinCode: generateJoinCode() };
+        set((s) => ({ trips: [trip, ...s.trips] }));
+        syncUpsertTrip(trip);
         return id;
       },
 
-      updateTrip: (id, name, emoji, startDate, endDate, people, currency, currencies, budget, groupBudget) =>
+      updateTrip: (id, name, emoji, startDate, endDate, people, currency, currencies, budget, groupBudget) => {
         set((s) => ({
           trips: s.trips.map((t) => {
             if (t.id !== id) return t;
             const currList = currencies && currencies.length > 0 ? currencies : (currency ? [currency] : t.currencies ?? [t.currency ?? 'USD']);
             return { ...t, name, emoji, startDate, endDate, people, currency: currList[0], currencies: currList, budget, groupBudget };
           }),
-        })),
+        }));
+        const updated = get().trips.find((t) => t.id === id);
+        if (updated) syncUpsertTrip(updated);
+      },
 
-      deleteTrip: (id) =>
+      deleteTrip: (id) => {
+        const removedRecordIds = get().history.filter((r) => r.tripId === id).map((r) => r.id);
         set((s) => ({
           trips: s.trips.filter((t) => t.id !== id),
           history: s.history.filter((r) => r.tripId !== id),
           tripPayments: s.tripPayments.filter((p) => p.tripId !== id),
-        })),
+        }));
+        syncDeleteTrip(id);
+        removedRecordIds.forEach(syncDeleteSplitRecord);
+        syncDeleteTripPaymentsFor(id);
+      },
 
-      addTripPayment: (tripId, from, to, amount) =>
-        set((s) => ({
-          tripPayments: [...s.tripPayments, { id: uid(), tripId, from, to, amount, date: new Date().toISOString() }],
-        })),
+      addTripPayment: (tripId, from, to, amount) => {
+        const payment = { id: uid(), tripId, from, to, amount, date: new Date().toISOString() };
+        set((s) => ({ tripPayments: [...s.tripPayments, payment] }));
+        syncUpsertTripPayment(payment);
+      },
 
-      removeTripPaymentsFor: (tripId, from, to) =>
+      removeTripPaymentsFor: (tripId, from, to) => {
         set((s) => ({
           tripPayments: s.tripPayments.filter((p) => !(p.tripId === tripId && p.from === from && p.to === to)),
-        })),
+        }));
+        syncDeleteTripPaymentsFor(tripId, from, to);
+      },
 
-      addHomePayment: (homeId, from, to, amount) =>
-        set((s) => ({
-          homePayments: [...(s.homePayments ?? []), { id: uid(), homeId, from, to, amount, date: new Date().toISOString() }],
-        })),
+      addHomePayment: (homeId, from, to, amount) => {
+        const payment = { id: uid(), homeId, from, to, amount, date: new Date().toISOString() };
+        set((s) => ({ homePayments: [...(s.homePayments ?? []), payment] }));
+        syncUpsertHomePayment(payment);
+      },
 
-      removeHomePaymentsFor: (homeId, from, to) =>
+      removeHomePaymentsFor: (homeId, from, to) => {
         set((s) => ({
           homePayments: (s.homePayments ?? []).filter((p) => !(p.homeId === homeId && p.from === from && p.to === to)),
-        })),
+        }));
+        syncDeleteHomePaymentsFor(homeId, from, to);
+      },
 
-      closeTrip: (id) => set((s) => ({ trips: s.trips.map((t) => (t.id === id ? { ...t, status: 'closed' } : t)) })),
+      closeTrip: (id) => {
+        set((s) => ({ trips: s.trips.map((t) => (t.id === id ? { ...t, status: 'closed' } : t)) }));
+        const updated = get().trips.find((t) => t.id === id);
+        if (updated) syncUpsertTrip(updated);
+      },
 
-      reopenTrip: (id) => set((s) => ({ trips: s.trips.map((t) => (t.id === id ? { ...t, status: 'open' } : t)) })),
+      reopenTrip: (id) => {
+        set((s) => ({ trips: s.trips.map((t) => (t.id === id ? { ...t, status: 'open' } : t)) }));
+        const updated = get().trips.find((t) => t.id === id);
+        if (updated) syncUpsertTrip(updated);
+      },
 
-      linkTabToTrip: (tabId, tripId) =>
+      linkTabToTrip: (tabId, tripId) => {
         set((s) => ({
           history: s.history.map((r) => r.id === tabId ? { ...r, tripId } : r),
-        })),
+        }));
+        const updated = get().history.find((r) => r.id === tabId);
+        if (updated) syncUpsertSplitRecord(updated);
+      },
 
-      linkTabToHome: (tabId, homeId) =>
+      linkTabToHome: (tabId, homeId) => {
         set((s) => ({
           history: s.history.map((r) => r.id === tabId ? { ...r, homeId } : r),
-        })),
+        }));
+        const updated = get().history.find((r) => r.id === tabId);
+        if (updated) syncUpsertSplitRecord(updated);
+      },
 
       startHomeEntry: (homeId) => {
         const home = get().homes.find((h) => h.id === homeId);
@@ -606,41 +702,53 @@ export const useSplitStore = create<SplitState>()(
 
       setExpenseCategory: (cat) => set({ expenseCategory: cat }),
 
-      addExpenseCategory: (cat) =>
+      addExpenseCategory: (cat) => {
         set((s) => ({
           expenseCategories: s.expenseCategories.includes(cat)
             ? s.expenseCategories
             : [...s.expenseCategories, cat],
-        })),
+        }));
+        syncProfileCategories({ expenseCategories: get().expenseCategories });
+      },
 
-      updateExpenseCategory: (oldCat, newCat) =>
+      updateExpenseCategory: (oldCat, newCat) => {
         set((s) => ({
           expenseCategories: s.expenseCategories.map((c) => c === oldCat ? newCat.trim() : c),
           history: s.history.map((r) => r.expenseCategory === oldCat ? { ...r, expenseCategory: newCat.trim() } : r),
-        })),
+        }));
+        syncProfileCategories({ expenseCategories: get().expenseCategories });
+      },
 
-      removeExpenseCategory: (cat) =>
+      removeExpenseCategory: (cat) => {
         set((s) => ({
           expenseCategories: s.expenseCategories.filter((c) => c !== cat),
-        })),
+        }));
+        syncProfileCategories({ expenseCategories: get().expenseCategories });
+      },
 
-      addHomeExpenseCategory: (cat) =>
+      addHomeExpenseCategory: (cat) => {
         set((s) => ({
           homeExpenseCategories: s.homeExpenseCategories.includes(cat)
             ? s.homeExpenseCategories
             : [...s.homeExpenseCategories, cat],
-        })),
+        }));
+        syncProfileCategories({ homeExpenseCategories: get().homeExpenseCategories });
+      },
 
-      updateHomeExpenseCategory: (oldCat, newCat) =>
+      updateHomeExpenseCategory: (oldCat, newCat) => {
         set((s) => ({
           homeExpenseCategories: s.homeExpenseCategories.map((c) => c === oldCat ? newCat.trim() : c),
           history: s.history.map((r) => r.expenseCategory === oldCat ? { ...r, expenseCategory: newCat.trim() } : r),
-        })),
+        }));
+        syncProfileCategories({ homeExpenseCategories: get().homeExpenseCategories });
+      },
 
-      removeHomeExpenseCategory: (cat) =>
+      removeHomeExpenseCategory: (cat) => {
         set((s) => ({
           homeExpenseCategories: s.homeExpenseCategories.filter((c) => c !== cat),
-        })),
+        }));
+        syncProfileCategories({ homeExpenseCategories: get().homeExpenseCategories });
+      },
 
       saveTripExpenseDirectly: ({ name, receiptDate, category, rawItems, participants, paidByName, tripId, currency: expCurrency, imageUri }) => {
         if (rawItems.length === 0) return;
@@ -676,6 +784,7 @@ export const useSplitStore = create<SplitState>()(
           source: 'manual',
         };
         set((s) => ({ history: [record, ...s.history].slice(0, 50) }));
+        syncUpsertSplitRecord(record);
       },
 
       startTripEntry: (tripId) => {
@@ -714,7 +823,7 @@ export const useSplitStore = create<SplitState>()(
     {
       name: 'split-history',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ history: state.history, groups: state.groups, trips: state.trips, tripPayments: state.tripPayments, homes: state.homes, friends: state.friends, expenseCategories: state.expenseCategories, homeExpenseCategories: state.homeExpenseCategories, itemCategories: state.itemCategories, defaultCurrency: state.defaultCurrency, imageUri: state.imageUri, imageBase64: state.imageBase64 }),
+      partialize: (state) => ({ history: state.history, groups: state.groups, trips: state.trips, tripPayments: state.tripPayments, homePayments: state.homePayments, homes: state.homes, friends: state.friends, expenseCategories: state.expenseCategories, homeExpenseCategories: state.homeExpenseCategories, itemCategories: state.itemCategories, defaultCurrency: state.defaultCurrency, imageUri: state.imageUri, imageBase64: state.imageBase64 }),
     },
   ),
 );

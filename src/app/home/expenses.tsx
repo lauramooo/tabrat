@@ -13,6 +13,7 @@ import { Text } from 'react-native-paper';
 import { ActionPill } from '@/components/ActionPill';
 import { Button, Card, CenteredModal, CircleIconButton, Dropdown, DropdownRow, FieldLabel, IconBadge, Input, SectionLabel } from '@/components/design';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
@@ -21,6 +22,7 @@ import { fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator'
 import { getCategoryColorMap, getCategoryData } from '@/utils/categoryColors';
 import { fmtDate } from '@/utils/date';
 import { mediumHaptic, selectionHaptic, lightHaptic } from '@/utils/haptics';
+import { applyTextShortcuts } from '@/utils/text';
 import type { SplitRecord } from '@/types';
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -88,9 +90,10 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
 
   const toggleParticipant = (p: string) => {
     selectionHaptic();
+    // paidBy is intentionally independent of participants — someone can pay without splitting
+    // the cost themselves, so removing them as a participant shouldn't clear them as the payer.
     setParticipants((prev) => {
       const next = prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p];
-      if (paidBy && !next.includes(paidBy)) setPaidBy(next[0] ?? null);
       return next;
     });
   };
@@ -114,7 +117,7 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
       <Pressable style={s.modalBackdrop} onPress={onClose}>
         <Pressable style={s.modalSheet} onPress={() => setCatOpen(false)}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={[s.modalTitle, { fontFamily: 'Poppins_700Bold', fontSize: 17, marginBottom: 0, lineHeight: 20 }]}>Add expense</Text>
+            <Text style={[s.modalTitle, { ...Type.cardTitle, marginBottom: 0, lineHeight: 20 }]}>Add expense</Text>
             <CircleIconButton variant="close" size={20} color={C.text} onPress={onClose} />
           </View>
           <View style={{ position: 'relative', flexShrink: 1 }}>
@@ -124,7 +127,7 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
             <Card row={false} padding={0} radius={10} style={{ marginBottom: 16, overflow: 'hidden' }}>
               <View style={s.expRow}>
                 <TextInput style={[s.expInput, { outlineWidth: 0 } as any]}
-                  value={name} onChangeText={(v) => { setName(v); setError(null); }}
+                  value={name} onChangeText={(v) => { setName(applyTextShortcuts(v)); setError(null); }}
                   placeholder="Rent, electricity, groceries…" placeholderTextColor={C.textDim}
                   autoFocus returnKeyType="next" />
               </View>
@@ -160,7 +163,7 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
                   key={cat}
                   onPress={() => { selectionHaptic(); setCategory(category === cat ? null : cat); setCatOpen(false); }}
                   divider={i > 0}
-                  trailing={category === cat ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+                  trailing={category === cat ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
                 >
                   <Text style={[s.expText, category === cat && { color: C.primary, fontFamily: 'Poppins_600SemiBold' }]}>{cat}</Text>
                 </DropdownRow>
@@ -210,22 +213,19 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
               </>
             )}
 
-            {participants.length > 0 && (
+            {people.length > 0 && (
               <>
                 <FieldLabel style={{ marginTop: 16, marginBottom: 6 }}>WHO PAID?</FieldLabel>
                 <View style={s.expChipsWrap}>
-                  {participants.map((p) => {
-                    const i = people.indexOf(p);
-                    return (
-                      <PersonChip
-                        key={p}
-                        name={p}
-                        index={i >= 0 ? i : 0}
-                        selected={paidBy === p}
-                        onPress={() => { selectionHaptic(); setPaidBy(p); }}
-                      />
-                    );
-                  })}
+                  {people.map((p, i) => (
+                    <PersonChip
+                      key={p}
+                      name={p}
+                      index={i}
+                      selected={paidBy === p}
+                      onPress={() => { selectionHaptic(); setPaidBy(p); }}
+                    />
+                  ))}
                 </View>
               </>
             )}
@@ -233,7 +233,7 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
             {error && <Text style={{ color: C.error, fontSize: 13, fontFamily: 'Poppins_400Regular', marginTop: 12 }}>{error}</Text>}
             <View style={{ height: 16 }} />
           </ScrollView>
-          <LinearGradient colors={[`${C.bg}00`, C.bg]} pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28 }} />
+          <LinearGradient colors={[`${C.bg}00`, C.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28, pointerEvents: 'none' }} />
           </View>
           <View style={{ flexDirection: 'row', gap: 10, paddingTop: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" size="small" label="Cancel" onPress={onClose} />
@@ -273,7 +273,7 @@ function HomeQuickEditModal({ exp, categories, onClose }: {
       <Pressable style={s.modalBackdrop} onPress={onClose}>
         <Pressable style={s.modalSheet} onPress={() => setCatOpen(false)}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={[s.modalTitle, { fontFamily: 'Poppins_700Bold', fontSize: 17, marginBottom: 0, lineHeight: 20 }]}>Edit expense</Text>
+            <Text style={[s.modalTitle, { ...Type.cardTitle, marginBottom: 0, lineHeight: 20 }]}>Edit expense</Text>
             <CircleIconButton variant="close" size={20} color={C.text} onPress={onClose} />
           </View>
 
@@ -334,7 +334,7 @@ function HomeQuickEditModal({ exp, categories, onClose }: {
                 key={cat}
                 onPress={() => { selectionHaptic(); setCategory(cat); setCatOpen(false); }}
                 divider={i > 0}
-                trailing={category === cat ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+                trailing={category === cat ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
               >
                 <Text style={[s.expText, category === cat && { color: C.primary, fontFamily: 'Poppins_600SemiBold' }]}>{cat}</Text>
               </DropdownRow>
@@ -530,6 +530,7 @@ export default function HomeExpensesScreen() {
 
   const quickAmount = parseFloat(quickAmountText) || 0;
   const canSaveQuick = quickName.trim().length > 0 && quickAmount > 0 && !!quickPayer;
+  const quickAddStarted = quickName.trim().length > 0 || quickAmountText.length > 0 || !!quickPayer;
 
   const openQuickPayerDropdown = () => {
     selectionHaptic();
@@ -612,7 +613,7 @@ export default function HomeExpensesScreen() {
             key={opt.value || '__everyone'}
             onPress={() => { selectionHaptic(); setScopePerson(opt.value); setScopeDropOpen(false); }}
             divider={i > 0}
-            trailing={scopePerson === opt.value ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+            trailing={scopePerson === opt.value ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
           >
             <Text style={[s.scopeDropItemText, scopePerson === opt.value && { color: C.primary }]}>{opt.label}</Text>
           </DropdownRow>
@@ -719,7 +720,7 @@ export default function HomeExpensesScreen() {
           <TextInput
             style={[s.quickAddNameInput, { outlineWidth: 0 } as any]}
             value={quickName}
-            onChangeText={setQuickName}
+            onChangeText={(v) => setQuickName(applyTextShortcuts(v))}
             onFocus={() => setQuickNameFocused(true)}
             onBlur={() => setQuickNameFocused(false)}
             placeholder="Quick add"
@@ -750,7 +751,7 @@ export default function HomeExpensesScreen() {
           </Text>
         </PressBtn>
         <PressBtn onPress={handleQuickSave} disabled={!canSaveQuick} hitSlop={8} noShadow>
-          <CheckCircleIcon size={17} color={canSaveQuick ? C.text : C.textDim} filled={canSaveQuick} fillColor="#F7D76A" />
+          <CheckCircleIcon size={19} color={canSaveQuick ? C.text : C.textDim} filled={canSaveQuick} fillColor={C.yellow} />
         </PressBtn>
         <Dropdown visible={quickPayerDropOpen} position={quickPayerDropPos} onClose={() => setQuickPayerDropOpen(false)} style={{ minWidth: 150 }}>
           {homePeople.map((name, i) => (
@@ -758,7 +759,7 @@ export default function HomeExpensesScreen() {
               key={name}
               onPress={() => { selectionHaptic(); setQuickPayer(name); setQuickPayerDropOpen(false); }}
               divider={i > 0}
-              trailing={quickPayer === name ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+              trailing={quickPayer === name ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
             >
               <Text style={s.scopeDropItemText}>{name === myName ? `${name} (me)` : name}</Text>
             </DropdownRow>
@@ -773,6 +774,7 @@ export default function HomeExpensesScreen() {
           size="big"
           label="Add"
           icon={<PlusIcon color={C.text} size={20} />}
+          disabled={quickAddStarted}
           onPress={() => { mediumHaptic(); setAddSheetVisible(true); }}
         />
       </View>
@@ -861,15 +863,15 @@ const s = StyleSheet.create({
 
   expHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 16, paddingTop: 14 },
   monthNavGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  monthNavLabel: { fontFamily: 'Poppins_700Bold', fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: C.text },
+  monthNavLabel: { ...Type.sectionLabel, letterSpacing: 0.6, textTransform: 'uppercase', color: C.text },
 
   scopeDrop: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
-  scopeDropText: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: C.text },
-  scopeDropItemText: { fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
+  scopeDropText: { ...Type.pillLabel, color: C.text },
+  scopeDropItemText: { ...Type.labelMedium, color: C.text },
 
   section: { paddingHorizontal: 16, paddingTop: 4 },
   emptySection: { alignItems: 'center', paddingVertical: 40 },
-  emptySectionText: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textDim, textAlign: 'center' },
+  emptySectionText: { ...Type.cardDesc, color: C.textDim, textAlign: 'center' },
 
   // Day strip
   dayPickerRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginBottom: 12 },
@@ -877,7 +879,7 @@ const s = StyleSheet.create({
   dayStripAllWrap: { alignItems: 'center', justifyContent: 'center' },
   dayStripAllPill: { paddingHorizontal: 10, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   dayStripAllPillActive: { backgroundColor: C.tripBg },
-  dayStripAll: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: C.textSub },
+  dayStripAll: { ...Type.pillLabel, color: C.textSub },
   dayStripAllActive: { color: C.text, fontFamily: 'Poppins_700Bold' },
   dayBadgeWrap: { alignItems: 'center', gap: 1, width: 38 },
   dayBadgeWeekday: { fontFamily: 'Poppins_600SemiBold', fontSize: 9, color: C.textSub, letterSpacing: 0.2 },
@@ -886,13 +888,15 @@ const s = StyleSheet.create({
   dayBadgeCircleActive: { backgroundColor: C.tripBg },
   dayBadgeDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2, backgroundColor: 'transparent' },
   dayBadgeDotActive: { backgroundColor: C.text },
-  dayBadgeNum: { fontFamily: 'Poppins_700Bold', fontSize: 14, color: C.text },
-  dayBadgeNumActive: { fontFamily: 'Poppins_900Black' },
+  dayBadgeNum: { ...Type.cardTitle, color: C.text },
+  // Explicit color (not just font weight) so this always wins if any other dimmed state is ever
+  // added here later — see trip/expenses.tsx for the bug this pattern caused there.
+  dayBadgeNumActive: { fontFamily: 'Poppins_900Black', color: C.text },
 
   expRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: InputMetrics.height },
 
-  tabName: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
-  tabTotal: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  tabName: { ...Type.cardTitle, color: C.text },
+  tabTotal: { ...Type.cardTitle, color: C.text },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   catBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, backgroundColor: C.primaryDim },
   catBadgeText: { fontFamily: 'Poppins_500Medium', fontSize: 10, color: C.primary },
@@ -903,14 +907,14 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     marginHorizontal: 16, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 8,
     backgroundColor: C.bg, borderRadius: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 6,
+    boxShadow: '0px 4px 12px rgba(0,0,0,0.12)', elevation: 6,
   },
   quickAddFieldActive: { borderColor: C.text },
   quickAddNameCard: { flex: 1, height: InputMetrics.height, justifyContent: 'center', borderWidth: 1.5, borderColor: C.border },
-  quickAddNameInput: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.text, paddingHorizontal: 12 },
+  quickAddNameInput: { ...Type.labelMedium, color: C.text, paddingHorizontal: 12 },
   quickAddAmountCard: { width: 66, height: InputMetrics.height, justifyContent: 'center', borderWidth: 1.5, borderColor: C.border },
   quickAddAmountInner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 2 },
-  quickAddAmountInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: C.text, padding: 0 },
+  quickAddAmountInput: { flex: 1, minWidth: 0, ...Type.pillLabel, color: C.text, padding: 0 },
   quickAddPayerBtn: {
     width: 62, height: InputMetrics.height, alignItems: 'center', justifyContent: 'center',
     borderRadius: InputMetrics.radius, backgroundColor: C.card, borderWidth: 1.5, borderColor: C.border,
@@ -920,34 +924,34 @@ const s = StyleSheet.create({
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
   modalSheet: { backgroundColor: C.bg, borderRadius: 20, padding: 20, maxHeight: '88%' },
-  modalTitle: { fontFamily: 'Poppins_900Black', fontSize: 24, color: C.text, marginBottom: 12 },
+  modalTitle: { ...Type.h2, color: C.text, marginBottom: 12 },
 
   // Add expense modal
-  expInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text, padding: 0 },
-  moneyPrefix: { fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.textSub },
+  expInput: { flex: 1, minWidth: 0, ...Type.bodySmall, color: C.text, padding: 0 },
+  moneyPrefix: { ...Type.bodySmall, color: C.textSub },
   moneyCard: { marginBottom: 16, borderWidth: 1.5, borderColor: 'transparent' },
   moneyCardFocused: { borderColor: C.text },
-  expText: { fontFamily: 'Poppins_500Medium', fontSize: 15, color: C.text },
+  expText: { ...Type.labelMedium, color: C.text },
   expChipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
 
   // Edit modal
-  editInput: { fontFamily: 'Poppins_400Regular', fontSize: 15 },
+  editInput: { ...Type.bodySmall },
 
   // Add sheet
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
   sheetCard: { backgroundColor: C.bg, borderRadius: 20, padding: 24 },
-  sheetTitle: { fontFamily: 'Poppins_900Black', fontSize: 22, color: C.text, lineHeight: 26 },
+  sheetTitle: { ...Type.h2, color: C.text, lineHeight: 26 },
   sheetOption: { gap: 14, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14 },
-  sheetOptionLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 16, color: C.text },
-  sheetOptionDesc: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: 2 },
+  sheetOptionLabel: { ...Type.button, color: C.text },
+  sheetOptionDesc: { ...Type.cardDesc, color: C.textSub, marginTop: 2 },
 
   // Link bill picker
   importHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   importEmpty: { alignItems: 'center', paddingVertical: 32, gap: 10 },
-  importEmptyText: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textDim },
+  importEmptyText: { ...Type.cardDesc, color: C.textDim },
   importRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   importRowIcon: { width: 36, height: 36, borderRadius: 9, backgroundColor: C.primaryDim, justifyContent: 'center', alignItems: 'center' },
-  importRowName: { fontFamily: 'Poppins_600SemiBold', fontSize: 14, color: C.text },
-  importRowMeta: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub },
+  importRowName: { ...Type.pillLabel, color: C.text },
+  importRowMeta: { ...Type.cardDesc, color: C.textSub },
   importRowAmt: { fontFamily: 'Poppins_900Black', fontSize: 16, color: C.text },
 });

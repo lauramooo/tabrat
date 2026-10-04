@@ -1,18 +1,25 @@
 {
   "expo": {
-    "name": "split-app",
-    "slug": "split-app",
+    "name": "Tab Rat",
+    "slug": "tab-rat",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "splitapp",
+    "scheme": "tabrat",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "bundleIdentifier": "com.lauramooo.tabrat",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.lauramooo.tabrat",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFBEF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -28,31 +35,42 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0A0A0A",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
-          }
+          "backgroundColor": "#FFFBEF",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 260,
+          "resizeMode": "contain"
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "SplitTab needs photo access to read your receipt.",
-          "cameraPermission": "SplitTab needs camera access to photograph your receipt."
+          "photosPermission": "Tab Rat needs photo access to read your receipt.",
+          "cameraPermission": "Tab Rat needs camera access to photograph your receipt.",
+          "microphonePermission": false
         }
       ],
       [
         "expo-secure-store",
         {
-          "faceIDPermission": "Allow SplitTab to use Face ID to protect your API key."
+          "faceIDPermission": "Allow Tab Rat to use Face ID to protect your API key."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-image",
+      "expo-web-browser",
+      "expo-font",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5cf6ee0b-8c3d-4197-abbc-bce73449ad18"
+      }
+    },
+    "owner": "lauramooo"
   }
 }

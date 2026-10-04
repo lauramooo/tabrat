@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { PressBtn } from '@/components/PressBtn';
-import { PencilIcon, PlusIcon, TrashIcon, UserMultipleIcon, XMarkIcon } from '@/components/FigmaIcons';
+import { PencilIcon, PlusIcon, TrashIcon, UserMultipleIcon } from '@/components/FigmaIcons';
+import { PersonChip } from '@/components/PersonChip';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -20,7 +21,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { Button, Card, CircleIconButton, FieldLabel, IconBadge, Input } from '@/components/design';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
-import { InputMetrics, Radius } from '@/constants/spacing';
+import { Type } from '@/constants/typography';
+import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import { toSentenceCase } from '@/utils/text';
@@ -40,14 +42,16 @@ function ActionPill({
   progress: Animated.AnimatedInterpolation<number>;
   icon?: string; iconNode?: React.ReactNode; label: string; color: string; textColor?: string; onPress: () => void;
 }) {
-  const width = progress.interpolate({ inputRange: [0, 1], outputRange: [36, 74], extrapolate: 'clamp' });
+  // Swipeable's `progress` is driven by the native animation driver, which doesn't support
+  // animating `width` (see shared @/components/ActionPill for the same fix) — the pill is
+  // fixed at its full width and only the label fades in via opacity, which IS natively supported.
   const textOp = progress.interpolate({ inputRange: [0.5, 0.9], outputRange: [0, 1], extrapolate: 'clamp' });
   return (
     <PressBtn style={s.actionWrap} onPress={onPress} activeOpacity={0.85}>
-      <Animated.View style={[s.actionPill, { width, backgroundColor: color }]}>
+      <View style={[s.actionPill, { backgroundColor: color }]}>
         {iconNode ?? <MaterialCommunityIcons name={icon as any} size={15} color={textColor} />}
         <Animated.Text style={[s.actionLabel, { opacity: textOp, color: textColor }]}>{toSentenceCase(label)}</Animated.Text>
-      </Animated.View>
+      </View>
     </PressBtn>
   );
 }
@@ -131,7 +135,7 @@ function GroupModal({ visible, onClose, editGroup }: GroupModalProps) {
                 {/* Friends quick-add */}
                 {friends.length > 0 && (
                   <View style={s.friendsQuickAdd}>
-                    <Text style={s.friendsQuickLabel}>FROM FRIENDS</Text>
+                    <Text style={s.friendsQuickLabel}>FROM RATS</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                       {friends
                         .filter((f) => !members.includes(f.name))
@@ -139,7 +143,6 @@ function GroupModal({ visible, onClose, editGroup }: GroupModalProps) {
                           <PressBtn key={f.id} style={s.friendQuickChip}
                             onPress={() => { selectionHaptic(); setMembers((prev) => [...prev, f.name]); }} activeOpacity={0.7}>
                             <Text style={s.friendQuickText}>{f.name}</Text>
-                            <PlusIcon color={C.primary} size={12} />
                           </PressBtn>
                         ))}
                     </ScrollView>
@@ -156,27 +159,26 @@ function GroupModal({ visible, onClose, editGroup }: GroupModalProps) {
                     returnKeyType="done"
                     style={[s.input, { flex: 1, minWidth: 0 }]}
                   />
-                  <Button
-                    variant="primary"
-                    size="small"
-                    label="Add"
+                  <PressBtn
+                    style={[s.addMemberBtn, memberInput.trim() && s.addMemberBtnActive]}
                     onPress={handleAddMember}
                     disabled={!memberInput.trim()}
-                    style={s.addMemberBtn}
-                  />
+                    activeOpacity={0.7}
+                  >
+                    <PlusIcon color={C.text} size={20} />
+                  </PressBtn>
                 </View>
                 {members.length > 0 && (
                   <View style={s.memberChips}>
-                    {members.map((member) => (
-                      <PressBtn
+                    {members.map((member, i) => (
+                      <PersonChip
                         key={member}
-                        style={s.memberChip}
+                        name={member}
+                        index={i}
+                        selected
+                        removable
                         onPress={() => { selectionHaptic(); setMembers((prev) => prev.filter((m) => m !== member)); }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={s.memberChipText}>{member}</Text>
-                        <XMarkIcon size={13} color={C.textSub} />
-                      </PressBtn>
+                      />
                     ))}
                   </View>
                 )}
@@ -305,24 +307,24 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 12 },
-  emptyTitle: { fontFamily: 'Poppins_900Black', fontSize: 26, color: C.text, textAlign: 'center' },
-  emptyText: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textSub, textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { ...Type.emptyTitle, color: C.text, textAlign: 'center' },
+  emptyText: { ...Type.cardDesc, color: C.textSub, textAlign: 'center', lineHeight: 22 },
 
   list: { flex: 1 },
   listContent: { padding: 16 },
 
   groupCard: { gap: 14 },
-  groupCardName: { fontFamily: 'Poppins_700Bold', fontSize: 16, color: C.text },
-  groupCardMembers: { fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.textSub },
-  memberCountText: { fontFamily: 'Poppins_700Bold', fontSize: 14, color: C.text },
+  groupCardName: { ...Type.cardTitle, color: C.text },
+  groupCardMembers: { ...Type.cardDesc, color: C.textSub, marginTop: -2 },
+  memberCountText: { ...Type.cardTitle, color: C.text },
 
   actionWrap: { width: 80, justifyContent: 'center', alignItems: 'center' },
   actionPill: {
-    height: 36, borderRadius: 18,
+    width: 74, height: 36, borderRadius: 18,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 4, paddingHorizontal: 8, overflow: 'hidden',
   },
-  actionLabel: { fontSize: 12, fontFamily: 'Poppins_600SemiBold' },
+  actionLabel: { ...Type.pillLabel },
 
   footer: { padding: 16, paddingTop: 8 },
 
@@ -333,27 +335,24 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 24, maxHeight: '88%',
   },
   modalHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 20 },
-  modalTitle: { fontFamily: 'Poppins_900Black', fontSize: 26, color: C.text, letterSpacing: 0.3, lineHeight: 31 },
+  modalTitle: { ...Type.h2, color: C.text, letterSpacing: 0.3, lineHeight: 31 },
 
   input: {},
 
   memberInputRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  addMemberBtn: { flex: 0, alignSelf: 'stretch', paddingHorizontal: 20, borderRadius: InputMetrics.radius },
+  // Matches the add-rat button on the main Settings > Rats page (friends.tsx's addCircle):
+  // bordered cream circle at rest, fills yellow with a black border once there's text to add.
+  addMemberBtn: { width: InputMetrics.height, height: InputMetrics.height, borderRadius: 999, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center' },
+  addMemberBtnActive: { backgroundColor: C.yellow, borderColor: C.text },
 
   memberChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  memberChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-  },
-  memberChipText: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: C.text },
 
-  errorText: { color: C.error, fontSize: 13, fontFamily: 'Poppins_400Regular' },
+  errorText: { color: C.error, ...Type.cardDesc },
 
   friendsQuickAdd: { gap: 6 },
-  friendsQuickLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 10, color: C.textDim, letterSpacing: 0.8 },
-  friendQuickChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: C.primaryDim, borderWidth: 1, borderColor: C.primary + '40' },
-  friendQuickText: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.text },
+  friendsQuickLabel: { ...Type.fieldLabel, color: C.textDim },
+  friendQuickChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: C.card },
+  friendQuickText: { ...Type.labelMedium, color: C.textSub },
 
   modalBtns: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
 });

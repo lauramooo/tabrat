@@ -10,9 +10,6 @@ import { toSentenceCase } from '@/utils/text';
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'filter' | 'filterWide' | 'destructive' | 'inactive';
 export type ButtonSize = 'small' | 'big';
 
-const YELLOW = '#F7D76A';
-const YELLOW_PRESSED = '#E7C94D';
-const ERROR_PRESSED = '#DE6354';
 const BIG_HEIGHT = 54;
 
 export function Button({
@@ -40,7 +37,7 @@ export function Button({
 
   switch (effectiveVariant) {
     case 'primary':
-      bg = pressed ? YELLOW_PRESSED : YELLOW;
+      bg = pressed ? C.yellowPressed : C.yellow;
       borderWidth = 1.5;
       bold = pressed;
       break;
@@ -62,7 +59,7 @@ export function Button({
       bold = pressed;
       break;
     case 'destructive':
-      bg = pressed ? ERROR_PRESSED : C.error;
+      bg = pressed ? C.errorPressed : C.error;
       textColor = C.text;
       borderWidth = 1.5;
       break;
@@ -84,6 +81,7 @@ export function Button({
       noShadow
       activeOpacity={1}
       disabled={disabled}
+      hitSlop={size === 'small' ? 6 : undefined}
       style={[
         container, sizeStyle,
         borderWidth ? { borderWidth, borderColor } : null,

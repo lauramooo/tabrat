@@ -1,6 +1,6 @@
 import { PressBtn } from '@/components/PressBtn';
-import { BillTypeIcon, CalendarIcon, CheckCircleIcon, CircleIcon, CloseCircleIcon, PlusIcon, ProgressIcon, ReopenIcon, SearchIcon, SortIcon, TrashIcon, TripTypeIcon } from '@/components/FigmaIcons';
-import { Button, Card, CircleIconButton, ConfirmModal, DatePickerModal, EditableTitle, FieldLabel, IconBadge, SectionLabel } from '@/components/design';
+import { BillTypeIcon, CalendarIcon, CheckCircleIcon, CircleIcon, CloseCircleIcon, EmptyStateIcon, PlusIcon, ProgressIcon, ReopenIcon, SortIcon, TrashIcon, TripTypeIcon } from '@/components/FigmaIcons';
+import { Button, Card, CircleIconButton, ConfirmModal, DatePickerModal, EditableTitle, FieldLabel, IconBadge, SearchInput, SectionLabel } from '@/components/design';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -26,13 +26,13 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { Badge, InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { calculateTripSettlement, fmt } from '@/utils/calculator';
 import { fmtDate } from '@/utils/date';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import type { Trip } from '@/types';
-import { TextInput } from 'react-native';
 import { ActionPill } from '@/components/ActionPill';
 
 function TabPaidRow({ label, paid, amount, onToggle }: {
@@ -308,26 +308,21 @@ export default function TripsScreen() {
         </View>
       </View>
       <View style={s.searchRow}>
-        <View style={s.searchBox}>
-          <SearchIcon color={C.text} size={16} style={{ marginLeft: 14 }} />
-          <TextInput
-            style={s.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search"
-            placeholderTextColor={C.textDim}
-          />
-          {searchQuery.length > 0 && (
-            <PressBtn onPress={() => setSearchQuery('')} hitSlop={8} style={{ paddingHorizontal: 14 }}>
+        <SearchInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search"
+          trailing={searchQuery.length > 0 && (
+            <PressBtn onPress={() => setSearchQuery('')} hitSlop={8} style={{ paddingHorizontal: 6 }}>
               <CloseCircleIcon size={15} color={C.textDim} />
             </PressBtn>
           )}
-        </View>
+        />
       </View>
 
       {trips.length === 0 ? (
         <View style={s.empty}>
-          <Text style={s.emptyEmoji}>??</Text>
+          <EmptyStateIcon size={52} />
           <Text style={s.emptyTitle}>No trips yet</Text>
           <Text style={s.emptyDesc}>Create a trip to track expenses across multiple tabs.</Text>
         </View>
@@ -421,48 +416,48 @@ const s = StyleSheet.create({
   header: { backgroundColor: 'transparent', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
   searchRow: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: 'transparent' },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { fontFamily: 'Poppins_900Black', fontSize: 30, color: '#000000' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: InputMetrics.radius, height: InputMetrics.height, overflow: 'hidden' },
-  searchInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text, height: '100%', textAlignVertical: 'center', paddingHorizontal: 10 },
+  headerTitle: { ...Type.display, color: '#000000' },
 
   list: { flex: 1 },
   listContent: { padding: 16, paddingTop: 12 },
 
   tripRowClosed: { opacity: 0.5 },
-  tripName: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  tripName: { ...Type.cardTitle, color: C.text },
   closedTitle: { color: C.textDim },
-  tripMeta: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, marginTop: -2 },
-  tripTotal: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  tripMeta: { ...Type.cardDesc, color: C.textSub, marginTop: -2 },
+  tripTotal: { ...Type.cardTitle, color: C.text },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   paidAmountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  paidAmountText: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.textSub, textDecorationLine: 'line-through' },
+  paidAmountText: { ...Type.cardTitle, color: C.textSub, textDecorationLine: 'line-through' },
 
   settlementPreview: { marginTop: 2, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.card, borderBottomLeftRadius: 10, borderBottomRightRadius: 10, gap: 4 },
   settlementRow: { flexDirection: 'row', alignItems: 'center' },
-  settlementFrom: { fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: C.text },
-  settlementTo: { flex: 1, fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: C.text },
-  settlementAmt: { fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: C.primary },
-  settlementMore: { fontFamily: 'Poppins_400Regular', fontSize: 11, color: C.textSub },
+  settlementFrom: { ...Type.pillLabel, color: C.text },
+  settlementTo: { flex: 1, ...Type.pillLabel, color: C.text },
+  settlementAmt: { ...Type.pillLabel, color: C.primary },
+  settlementMore: { ...Type.cardDesc, color: C.textSub },
 
 
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 12 },
   emptyEmoji: { fontSize: 52 },
-  emptyTitle: { fontFamily: 'Poppins_900Black', fontSize: 26, color: C.text },
-  emptyDesc: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textSub, textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { ...Type.emptyTitle, color: C.text },
+  // minHeight matches Homes'/Feed's — reserves space for the longest of the three tabs' empty-
+  // state copy so a shorter description here doesn't shift the icon relative to the others.
+  emptyDesc: { ...Type.bodySmall, color: C.textSub, textAlign: 'center', lineHeight: 24, minHeight: 66 },
 
 
   tripPayLine: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  tripPayLineText: { fontFamily: 'Poppins_400Regular', fontSize: 11, color: C.textDim },
+  tripPayLineText: { ...Type.cardDesc, color: C.textDim },
 
   qBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   qCard: { backgroundColor: C.bg, borderRadius: 20, padding: 20, width: '100%', maxWidth: 420, gap: 12 },
   qTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2, gap: 8 },
   qDatePill: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.primaryDim, borderRadius: InputMetrics.radius, height: InputMetrics.height, paddingHorizontal: 12 },
-  qDatePillText: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: C.text },
+  qDatePillText: { ...Type.labelMedium, color: C.text },
   qPersonRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 12, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
-  qPersonName: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
-  qPersonAmt: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: C.text },
+  qPersonName: { flex: 1, ...Type.labelMedium, color: C.text },
+  qPersonAmt: { ...Type.cardTitle, color: C.text },
   qSavedRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 18 },
-  qSavedText: { fontFamily: 'Poppins_500Medium', fontSize: 12, color: C.success },
+  qSavedText: { ...Type.labelMedium, color: C.success },
 });

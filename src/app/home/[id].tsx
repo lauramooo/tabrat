@@ -1,6 +1,8 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { PressBtn } from '@/components/PressBtn';
-import { CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, ExpenseIcon, MoreIcon, PencilIcon, PlusCircleIcon, ReopenIcon, SortIcon, TrashIcon } from '@/components/FigmaIcons';
+import { CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, ExpenseIcon, MoreIcon, PencilIcon, PlusCircleIcon, ReopenIcon, SendIcon, SortIcon, TrashIcon } from '@/components/FigmaIcons';
+import { ShareCodeModal } from '@/components/ShareCodeModal';
+import { ScreenHeaderTitle, ScreenSubHeader } from '@/components/FlowSteps';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { createElement, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -9,11 +11,12 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Svg, { G, Path } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { Avatar } from '@/components/Avatar';
 import { Button, Card, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, DatePickerModal, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, Input, PayModal, RunningTotalsCard, SectionLabel, SettlementRow } from '@/components/design';
 import { C } from '@/constants/colors';
+import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
@@ -105,7 +108,7 @@ function PieDonut({ data, centerText, currency }: {
   return (
     <View style={{ width: PIE_SIZE, height: PIE_SIZE }}>
       <Svg width={PIE_SIZE} height={PIE_SIZE} viewBox={`0 0 ${PIE_SIZE} ${PIE_SIZE}`}>
-        <G rotation={-90} origin={`${center}, ${center}`}>
+        <G transform={`rotate(-90, ${center}, ${center})`}>
           {paintOrder.map((d) => {
             const startAngle = -d.offset / radius;
             const endAngle = (-d.offset + d.len) / radius;
@@ -120,7 +123,7 @@ function PieDonut({ data, centerText, currency }: {
                   setTooltip((prev) => (prev?.label === d.label ? null : { label: d.label, value: d.value, textColor: d.textColor }));
                 }}
                 onLongPress={() => { wasLongPress.current = true; lightHaptic(); setTooltip({ label: d.label, value: d.value, textColor: d.textColor }); }}
-                onPressOut={() => { if (wasLongPress.current) { setTooltip(null); wasLongPress.current = false; } }}
+                {...(Platform.OS !== 'web' ? { onPressOut: () => { if (wasLongPress.current) { setTooltip(null); wasLongPress.current = false; } } } : null)}
               />
             );
           })}
@@ -128,8 +131,8 @@ function PieDonut({ data, centerText, currency }: {
       </Svg>
       <View style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        justifyContent: 'center', alignItems: 'center',
-      }} pointerEvents="none">
+        justifyContent: 'center', alignItems: 'center', pointerEvents: 'none',
+      }}>
         {tooltip ? (
           <View style={s.pieTooltip}>
             <Text style={[s.pieTooltipAmt, { color: tooltip.textColor }]}>{fmt(tooltip.value, currency)}</Text>
@@ -299,7 +302,7 @@ function EditHomeModal({
             <FieldLabel style={{ marginBottom: 6 }}>DATES</FieldLabel>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
               <HomeDatePickerRow label="Start" value={startDate} onChange={setStartDate} />
-              <Text style={{ color: C.textDim, fontSize: 15, fontFamily: 'Poppins_500Medium' }}>–</Text>
+              <Text style={{ color: C.textDim, ...Type.labelMedium }}>–</Text>
               <HomeDatePickerRow label="End" value={endDate} onChange={setEndDate} />
             </View>
 
@@ -328,7 +331,7 @@ function EditHomeModal({
                 />
                 {newMember.trim() ? (
                   <PressBtn onPress={addMember} hitSlop={8} activeOpacity={0.7}>
-                    <PlusCircleIcon color={C.primary} size={15} />
+                    <PlusCircleIcon color={C.primary} size={15} strokeWidth={1.8} />
                   </PressBtn>
                 ) : null}
               </View>
@@ -365,7 +368,7 @@ function EditHomeModal({
                       </PressBtn>
                     </View>
                     {isEditing && renameCount > 0 && (
-                      <Text style={{ fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub, lineHeight: 16, paddingHorizontal: 14, paddingBottom: 10 }}>
+                      <Text style={{ ...Type.cardDesc, color: C.textSub, lineHeight: 16, paddingHorizontal: 14, paddingBottom: 10 }}>
                         Editing this category will apply the change to all expenses with this category ({renameCount} expense{renameCount !== 1 ? 's' : ''}).
                       </Text>
                     )}
@@ -428,10 +431,16 @@ export default function HomeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const myName = useMyName();
+  const insets = useSafeAreaInsets();
+  // The actions menu renders in a full-screen Modal, ignoring the header's own layout — position
+  // it using the safe-area inset plus the standard native header content height so it lands just
+  // under the header button regardless of device, matching BillHeader's actions menu.
+  const actionsTop = insets.top + (Platform.OS === 'ios' ? 44 : 56) + 6;
   const { homes, history, homePayments, deleteHome, closeHome, reopenHome, updateHome, addHomePayment, removeHomePaymentsFor } = useSplitStore();
 
   const home = homes.find((h) => h.id === id);
   const [actionsModal, setActionsModal] = useState(false);
+  const [shareModal, setShareModal] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [payModal, setPayModal] = useState<{ from: string; to: string; amount: number } | null>(null);
@@ -554,19 +563,15 @@ export default function HomeDetailScreen() {
         headerTitleAlign: 'center',
         headerTransparent: false,
         headerStyle: { backgroundColor: C.bg },
-        headerTitle: () => (
-          <View style={{ alignItems: 'center' }}>
-            <Text style={s.hdrTitle}>{home.name}</Text>
-            <View style={s.hdrMonthNavRow}>
-              <CircleIconButton variant="back" size={20} color={C.primary} onPress={prevMonth} hitSlop={10} />
-              <Text style={s.monthLabel}>{MONTH_NAMES[viewMonth]} {viewYear}</Text>
-              <CircleIconButton variant="back" size={20} color={isCurrentMonth ? C.textDim : C.primary} onPress={nextMonth}
-                disabled={isCurrentMonth} hitSlop={10} style={{ transform: [{ rotate: '180deg' }] }} />
-            </View>
-          </View>
-        ),
+        // Clears any static `title` this route might inherit — headerTitle:()=>null alone
+        // doesn't suppress that string, so it would show stacked with the title row below.
+        title: '',
+        headerTitle: () => null,
+        // back() (not a hardcoded replace to the homes list) so this returns to wherever the
+        // home was actually opened from — Feed or Homes — instead of always landing on Homes
+        // regardless of origin. Both screens reach this route via push, so history is intact.
         headerLeft: () => (
-          <CircleIconButton variant="back" size={28} color={C.primary} onPress={() => router.replace('/(tabs)/homes' as any)} style={{ paddingHorizontal: 12 }} />
+          <CircleIconButton variant="back" size={28} color={C.primary} onPress={() => router.back()} style={{ paddingHorizontal: 12 }} />
         ),
         headerRight: () => (
           <PressBtn onPress={() => setActionsModal(true)} activeOpacity={0.5} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
@@ -574,6 +579,16 @@ export default function HomeDetailScreen() {
           </PressBtn>
         ),
       }} />
+      <ScreenSubHeader>
+        <ScreenHeaderTitle name={home.name} reserveDateSlot={false}>
+          <View style={s.hdrMonthNavRow}>
+            <CircleIconButton variant="back" size={20} color={C.primary} onPress={prevMonth} hitSlop={10} />
+            <Text style={s.monthLabel}>{MONTH_NAMES[viewMonth]} {viewYear}</Text>
+            <CircleIconButton variant="back" size={20} color={isCurrentMonth ? C.textDim : C.primary} onPress={nextMonth}
+              disabled={isCurrentMonth} hitSlop={10} style={{ transform: [{ rotate: '180deg' }] }} />
+          </View>
+        </ScreenHeaderTitle>
+      </ScreenSubHeader>
 
       {/* Member bubbles strip */}
       {homePeople.length > 0 && (
@@ -632,7 +647,7 @@ export default function HomeDetailScreen() {
             key={opt.value || '__everyone'}
             onPress={() => { selectionHaptic(); setScopePerson(opt.value); setScopeDropOpen(false); }}
             divider={i > 0}
-            trailing={scopePerson === opt.value ? <CheckCircleIcon size={15} color={C.text} filled fillColor="#F7D76A" /> : undefined}
+            trailing={scopePerson === opt.value ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
           >
             <Text style={[s.scopeDropItemText, scopePerson === opt.value && { color: C.primary }]}>{opt.label}</Text>
           </DropdownRow>
@@ -815,10 +830,14 @@ export default function HomeDetailScreen() {
       {/* Actions modal */}
       <Modal visible={actionsModal} transparent animationType="none" onRequestClose={() => setActionsModal(false)}>
         <Pressable style={s.actionsBackdrop} onPress={() => setActionsModal(false)}>
-          <View style={s.actionsCard}>
+          <View style={[s.actionsCard, { top: actionsTop }]}>
             <PressBtn style={s.actionsRow} onPress={() => { setActionsModal(false); setEditVisible(true); }} activeOpacity={0.6}>
               <PencilIcon color={C.textSub} size={17} />
               <Text style={s.actionsRowText}>Edit</Text>
+            </PressBtn>
+            <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); setShareModal(true); }} activeOpacity={0.6}>
+              <SendIcon color={C.textSub} size={17} />
+              <Text style={s.actionsRowText}>Share</Text>
             </PressBtn>
             {home.status !== 'closed' ? (
               <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); closeHome(home.id); }} activeOpacity={0.6}>
@@ -838,6 +857,14 @@ export default function HomeDetailScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      <ShareCodeModal
+        visible={shareModal}
+        onClose={() => setShareModal(false)}
+        title="Share home"
+        code={home.joinCode}
+        message={`Join my home "${home.name}" on Tab Rat! Code: ${home.joinCode}`}
+      />
 
       {/* Delete confirm */}
       <ConfirmModal
@@ -872,26 +899,25 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   // Header (matches trip/[id].tsx)
-  hdrTitle: { fontFamily: 'Poppins_900Black', fontSize: 22, color: C.text, letterSpacing: 0.3 },
   hdrMonthNavRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -2 },
   friendStrip: { flexDirection: 'row', justifyContent: 'center', paddingTop: 4, paddingBottom: 4 },
   hdrAvatar: { width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: C.bg },
 
   scrollContent: { paddingBottom: 24 },
 
-  monthLabel: { fontFamily: 'Poppins_400Regular', fontSize: 12, color: C.textSub },
+  monthLabel: { ...Type.cardDesc, color: C.textSub },
 
   // Total + person scope dropdown (identical to trip/[id].tsx)
   totalBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
-  totalBarLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 11, color: C.textSub, letterSpacing: 0.8 },
-  totalBarAmt: { fontFamily: 'Poppins_900Black', fontSize: 26, color: C.text, lineHeight: 30 },
+  totalBarLabel: { ...Type.fieldLabel, color: C.textSub },
+  totalBarAmt: { ...Type.h2, color: C.text, lineHeight: 30 },
   scopeDrop: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
-  scopeDropText: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: C.text },
-  scopeDropItemText: { fontFamily: 'Poppins_500Medium', fontSize: 14, color: C.text },
+  scopeDropText: { ...Type.pillLabel, color: C.text },
+  scopeDropItemText: { ...Type.labelMedium, color: C.text },
 
   section: { paddingHorizontal: 16, paddingTop: 16 },
   emptySection: { alignItems: 'center', paddingVertical: 40 },
-  emptySectionText: { fontFamily: 'Poppins_400Regular', fontSize: 14, color: C.textDim, textAlign: 'center' },
+  emptySectionText: { ...Type.cardDesc, color: C.textDim, textAlign: 'center' },
 
   // Pie chart
   pieSection: { padding: 12 },
@@ -900,39 +926,39 @@ const s = StyleSheet.create({
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   legendDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
   legendLabel: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 11, color: C.text },
-  legendAmt: { fontFamily: 'Poppins_700Bold', fontSize: 11, color: C.text, width: 62 },
+  legendAmt: { ...Type.cardTitle, color: C.text, width: 62 },
   pieCenterText: { fontFamily: 'Poppins_900Black', fontSize: 12, color: C.text, textAlign: 'center' },
-  pieTooltip: { alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 5 },
+  pieTooltip: { alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, boxShadow: '0px 3px 8px rgba(0,0,0,0.15)', elevation: 5 },
   pieTooltipAmt: { fontFamily: 'Poppins_900Black', fontSize: 13 },
   pieTooltipLabel: { fontFamily: 'Poppins_500Medium', fontSize: 10, color: C.textSub, maxWidth: 80 },
-  noDataNote: { fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.textDim, textAlign: 'center', paddingVertical: 16 },
+  noDataNote: { ...Type.cardDesc, color: C.textDim, textAlign: 'center', paddingVertical: 16 },
 
   // Settlement cards (matches trip/[id].tsx)
   settleCard: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, gap: 8 },
   settleOwes: { fontFamily: 'Poppins_500Medium', fontSize: 12, color: C.text },
 
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  noSettlementNote: { fontFamily: 'Poppins_400Regular', fontSize: 13, color: C.textDim, textAlign: 'center', marginTop: 12, marginHorizontal: 16, fontStyle: 'italic' },
+  noSettlementNote: { ...Type.cardDesc, color: C.textDim, textAlign: 'center', marginTop: 12, marginHorizontal: 16, fontStyle: 'italic' },
 
   footer: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.border },
 
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
   modalSheet: { backgroundColor: C.bg, borderRadius: 20, padding: 20, maxHeight: '88%' },
-  modalTitle: { fontFamily: 'Poppins_900Black', fontSize: 24, color: C.text, marginBottom: 12 },
+  modalTitle: { ...Type.h2, color: C.text, marginBottom: 12 },
 
   // Edit modal — mirrors trip/[id].tsx exactly
   editDateBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: InputMetrics.radius, height: InputMetrics.height, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14 },
-  editDateText: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 15, color: C.text },
+  editDateText: { flex: 1, ...Type.labelMedium, color: C.text },
   friendAddRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: InputMetrics.height, gap: 10 },
-  friendAddInput: { flex: 1, minWidth: 0, fontFamily: 'Poppins_400Regular', fontSize: 15, color: C.text },
-  friendListName: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 15, color: C.text },
-  editInput: { fontFamily: 'Poppins_500Medium', fontSize: 15 },
+  friendAddInput: { flex: 1, minWidth: 0, ...Type.bodySmall, color: C.text },
+  friendListName: { flex: 1, ...Type.labelMedium, color: C.text },
+  editInput: { ...Type.labelMedium },
 
   // Actions modal (matches trip/[id].tsx)
   actionsBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
-  actionsCard: { position: 'absolute', top: 54, right: 10, backgroundColor: C.bg, borderRadius: 14, width: 210, overflow: 'hidden' },
+  actionsCard: { position: 'absolute', right: 10, backgroundColor: C.bg, borderRadius: 14, width: 210, overflow: 'hidden' },
   actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
   actionsRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border },
-  actionsRowText: { fontFamily: 'Poppins_400Regular', fontSize: 16, color: C.text },
+  actionsRowText: { ...Type.bodySmall, color: C.text },
 });
