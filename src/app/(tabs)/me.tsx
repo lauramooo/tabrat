@@ -158,21 +158,21 @@ export default function MeScreen() {
             badgeBg={C.billBg} badgeFg={C.billFg}
             label="Submit an idea"
             sub="Tell us what you'd like to see"
-            onPress={() => router.push('/roadmap?type=idea' as any)}
+            onPress={() => openSupportEmail('Tab Rat idea')}
           />
           <NavCard
             Icon={BugIcon}
             badgeBg={C.billBg} badgeFg={C.billFg}
             label="Report a bug"
             sub="Something not working right?"
-            onPress={() => router.push('/roadmap?type=bug' as any)}
+            onPress={() => openSupportEmail('Tab Rat bug report')}
           />
           <NavCard
             Icon={MessageBubbleIcon}
             badgeBg={C.billBg} badgeFg={C.billFg}
             label="Contact us"
             sub="Get in touch directly"
-            onPress={() => openSupportEmail('Tab Rat Feedback')}
+            onPress={() => openSupportEmail('Tab Rat question')}
           />
         </View>
 
@@ -183,7 +183,7 @@ export default function MeScreen() {
             Icon={SettingsIcon}
             badgeBg={C.homeBg} badgeFg={C.homeFg}
             label="Settings"
-            sub="Receipt scanning, data"
+            sub="Account and data"
             onPress={() => router.push('/settings')}
           />
         </View>

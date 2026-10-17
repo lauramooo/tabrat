@@ -51,15 +51,17 @@ Based on what the app actually does (from the codebase, not guesswork):
 | Data type | Collected? | Linked to identity? | Used for tracking? |
 |---|---|---|---|
 | Email Address | Yes (auth) | Yes | No |
-| Photos | Yes (optional — profile photo, receipt images) | Yes | No |
+| Name (display name / username) | Yes (optional) | Yes | No |
+| Photos | Yes (optional — profile photo; receipt images sent to Anthropic for scanning) | Yes | No |
 | User Content (app data: trips/expenses/etc.) | Yes | Yes | No |
-| Other Data (Anthropic API key) | **No** — stored only on-device, never transmitted to your servers, so this is not "collected" by you | — | — |
 
 No analytics, no advertising identifiers, no location data, no contacts, no tracking across apps/websites (there's no analytics SDK in the codebase at all — confirmed during the earlier security audit).
 
 ## Age rating questionnaire
 
-Nothing in the app touches any of Apple's content categories (violence, mature themes, gambling, user-generated content shared publicly, unrestricted web access, etc.) — answer "None" / "No" to everything and it should land on **4+**.
+Nothing in the app touches any of Apple's content categories (violence, mature themes, gambling, unrestricted web access, etc.) — answer "None" / "No" to everything and it should land on **4+**.
+
+User-generated content: **No**. Nothing is public. The only sharing is a trip/home/bill shared by join code with people the user invites themselves (the old public Roadmap board was removed in build 6 for this reason; ideas and bug reports go by email instead). Don't add a public feed/board back without also adding report + block, per guideline 1.2.
 
 ## Screenshots
 

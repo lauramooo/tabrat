@@ -125,23 +125,3 @@ export interface SplitRecord {
   // collaborator. Trip/home expenses are shared via their trip's/home's own joinCode instead.
   joinCode?: string;
 }
-
-// -- Roadmap / feedback board ----------------------------------------------------
-// Unlike everything else above, this is shared data: every signed-in account sees every
-// submission (see supabase/migrations/0007_feedback_board.sql), not just its own.
-
-export type FeedbackType = 'idea' | 'bug';
-export type FeedbackStatus = 'under_review' | 'planned' | 'in_progress' | 'done' | 'declined';
-
-export interface FeedbackItem {
-  id: string;
-  userId: string;
-  type: FeedbackType;
-  title: string;
-  description?: string;
-  imageUrl?: string;
-  status: FeedbackStatus;
-  voteCount: number;
-  createdAt: string;
-  myVote: boolean; // whether the current account has voted on this item
-}

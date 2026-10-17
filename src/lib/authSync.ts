@@ -1,4 +1,4 @@
-import { PROFILE_HANDLE_KEY, PROFILE_PHOTO_KEY, PROFILE_USERNAME_KEY, PROFILE_USES_SHARED_KEY, setStorageItem } from '@/app/settings';
+import { PROFILE_HANDLE_KEY, PROFILE_PHOTO_KEY, PROFILE_USERNAME_KEY, setStorageItem } from '@/app/settings';
 import { supabase } from '@/lib/supabase';
 import { setSyncUserId } from '@/lib/sync';
 import { useSplitStore } from '@/store/useSplitStore';
@@ -77,7 +77,6 @@ export async function pullRemoteStateAndReplace(userId: string) {
   if (profileRes.data?.display_name) await setStorageItem(PROFILE_USERNAME_KEY, profileRes.data.display_name);
   if (profileRes.data?.username) await setStorageItem(PROFILE_HANDLE_KEY, profileRes.data.username);
   if (profileRes.data?.photo_url) await setStorageItem(PROFILE_PHOTO_KEY, profileRes.data.photo_url);
-  await setStorageItem(PROFILE_USES_SHARED_KEY, profileRes.data?.uses_shared_key ? '1' : '0');
 }
 
 // Call once from the root layout. Additive: guest/signed-out mode never touches the network —

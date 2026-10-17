@@ -39,11 +39,11 @@ The bottom tab bar (`app/(tabs)/_layout.tsx`) has four tabs — Feed (`index.tsx
 
 **Types** (`src/types/index.ts`) define `Trip`, `Home`, `Group`, `Person`, `SplitRecord` (a saved tab/trip-expense/home-expense — the one record shape all three contexts save into `history`), plus `Payer`/`PaymentStatus` for multi-payer and settle-up tracking. `SplitRecord.tripId`/`homeId` link an expense back to its trip or home; unset means it's a standalone tab.
 
-**Receipt parsing** (`src/utils/receiptParser.ts`) sends the image as base64 to Claude Haiku via the Anthropic Messages API directly with `fetch` (model: `claude-haiku-4-5-20251001`). No Anthropic SDK — raw fetch to avoid React Native compatibility issues.
+**Receipt parsing** (`src/utils/receiptParser.ts`) sends the image as base64 to Claude Haiku via the Anthropic Messages API with `fetch` (through the `scan-receipt` proxy in practice) (model: `claude-haiku-4-5-20251001`). No Anthropic SDK — raw fetch to avoid React Native compatibility issues.
 
 **Split calculation** (`src/utils/calculator.ts`): items can be assigned to multiple people and are split equally among assignees. Tax and tip are distributed proportionally by each person's share of the pre-tax subtotal.
 
-**API key** is stored via `expo-secure-store` (native) or `localStorage` (web), abstracted in `src/app/settings.tsx` via exported `getApiKey`/`saveApiKey` (plus generic `getStorageItem`/`setStorageItem` used for profile username/photo, reused by `(tabs)/me.tsx`). The upload screen calls `getApiKey()` before every API call and redirects to `/settings` if missing.
+**Receipt scanning key**: during the TestFlight/friends-and-family phase every account scans via the `scan-receipt` Supabase Edge Function, which holds the owner's Anthropic key as a server secret (`profiles.uses_shared_key` defaults to true — migration 0008). The bring-your-own-key and invite-code UI was removed for now; it's planned to come back alongside a paid subscription. `src/app/settings.tsx` still exports generic `getStorageItem`/`setStorageItem` (profile username/photo, reused by `(tabs)/me.tsx`). The first scan shows a one-time consent prompt (App Store guideline 5.1.2(i)).
 
 **Currency is display-only** — `fmt(n, currency)` in `calculator.ts` just prefixes a currency symbol; there is no exchange-rate conversion. Multi-currency trips sum raw numbers under one symbol.
 

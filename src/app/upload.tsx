@@ -11,16 +11,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
-import { Button, CircleIconButton } from '@/components/design';
+import { Button, CircleIconButton, ConfirmModal } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { FlowSteps } from '@/components/FlowSteps';
 import { useSplitStore } from '@/store/useSplitStore';
-import { getApiKey, getStorageItem, PROFILE_USES_SHARED_KEY } from './settings';
+import { getStorageItem, setStorageItem } from './settings';
 import { supabase } from '@/lib/supabase';
-import { parseReceipt, parseReceiptViaProxy } from '@/utils/receiptParser';
+import { parseReceiptViaProxy } from '@/utils/receiptParser';
 import { errorMessage } from '@/utils/errors';
 import { lightHaptic, mediumHaptic, errorHaptic } from '@/utils/haptics';
+// Set once the user OKs sending receipt photos to Anthropic — App Store guideline 5.1.2(i)
+// requires disclosing and getting consent before sharing personal data with a third-party AI.
+const AI_SCAN_CONSENT_KEY = 'ai_scan_consent';
+
 const MIN_DIM = 60;
 // L-bracket handle dimensions — positioned INSIDE the crop box, never extending outside
 const B = 28;   // bracket width/height
@@ -58,6 +62,7 @@ export default function UploadScreen() {
   const [base64, setBase64] = useState<string | null>(storeB64);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [consentVisible, setConsentVisible] = useState(false);
   // Crop state
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
   const [imgSize, setImgSize] = useState({ w: 1, h: 1 });
@@ -212,6 +217,18 @@ export default function UploadScreen() {
 
   const handleScan = async () => {
     if (!uri || !base64) { setError('Please select an image first.'); return; }
+    if ((await getStorageItem(AI_SCAN_CONSENT_KEY)) !== '1') { setConsentVisible(true); return; }
+    runScan();
+  };
+
+  const handleConsent = async () => {
+    setConsentVisible(false);
+    await setStorageItem(AI_SCAN_CONSENT_KEY, '1');
+    runScan();
+  };
+
+  const runScan = async () => {
+    if (!uri || !base64) return;
     setError(null);
     mediumHaptic();
     setLoading(true);
@@ -248,17 +265,9 @@ export default function UploadScreen() {
         }
       }
 
-      const usesSharedKey = (await getStorageItem(PROFILE_USES_SHARED_KEY)) === '1';
-      let data;
-      if (usesSharedKey) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { errorHaptic(); setLoading(false); return; }
-        data = await parseReceiptViaProxy(scanB64, process.env.EXPO_PUBLIC_SUPABASE_URL!, session.access_token);
-      } else {
-        const apiKey = await getApiKey();
-        if (!apiKey) { errorHaptic(); setLoading(false); router.push('/settings'); return; }
-        data = await parseReceipt(scanB64, apiKey);
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { errorHaptic(); setLoading(false); return; }
+      const data = await parseReceiptViaProxy(scanB64, process.env.EXPO_PUBLIC_SUPABASE_URL!, session.access_token);
       if (!data.items?.length) {
         errorHaptic();
         setError('Could not find any items on this receipt. Try a clearer photo, or enter items manually.');
@@ -365,6 +374,15 @@ export default function UploadScreen() {
         </View>
       </View>
 
+      <ConfirmModal
+        visible={consentVisible}
+        onClose={() => setConsentVisible(false)}
+        onConfirm={handleConsent}
+        title="Scan with AI?"
+        body="Your receipt photo is sent to Claude, Anthropic's AI, to read the items."
+        cancelLabel="Not now"
+        confirmLabel="Scan"
+      />
     </SafeAreaView>
   );
 }

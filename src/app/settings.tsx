@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Platform,
   ScrollView, StyleSheet, View,
@@ -8,13 +8,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Button, Card, ConfirmModal, IconBadge, Input, SectionLabel } from '@/components/design';
-import { AlertIcon, CheckCircleIcon, KeyIcon, TrashIcon } from '@/components/FigmaIcons';
+import { Card, ConfirmModal, IconBadge, SectionLabel } from '@/components/design';
+import { AlertIcon, TrashIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { supabase } from '@/lib/supabase';
 import { useSplitStore } from '@/store/useSplitStore';
-import { successHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
+import { mediumHaptic, selectionHaptic } from '@/utils/haptics';
 
 export const API_KEY_STORAGE_KEY = 'anthropic_api_key';
 export const PROFILE_USERNAME_KEY = 'profile_username';
@@ -22,22 +22,13 @@ export const PROFILE_PHOTO_KEY = 'profile_photo';
 // Distinct from PROFILE_USERNAME_KEY (which despite its name actually holds the display name) —
 // this is the unique @handle set during onboarding, for the future "add friends" lookup.
 export const PROFILE_HANDLE_KEY = 'profile_handle';
-// Mirrors profiles.uses_shared_key (synced on sign-in, see src/lib/authSync.ts) — true if this
-// account redeemed a family/friend invite code and should use the app owner's shared Anthropic
-// key instead of bringing their own. '1' when true, absent/anything else when false.
-export const PROFILE_USES_SHARED_KEY = 'profile_uses_shared_key';
 
 export { CURRENCIES } from '@/constants/currencies';
 
-export async function getApiKey(): Promise<string | null> {
-  if (Platform.OS === 'web') return localStorage.getItem(API_KEY_STORAGE_KEY);
-  return SecureStore.getItemAsync(API_KEY_STORAGE_KEY);
-}
-export async function saveApiKey(key: string): Promise<void> {
-  if (Platform.OS === 'web') { localStorage.setItem(API_KEY_STORAGE_KEY, key); return; }
-  return SecureStore.setItemAsync(API_KEY_STORAGE_KEY, key);
-}
-export async function removeApiKey(): Promise<void> {
+// Bring-your-own-key scanning was removed for the testing phase (everyone scans via the shared
+// key — see supabase/migrations/0008). Kept only so Delete account still clears a key saved by an
+// older build.
+async function removeApiKey(): Promise<void> {
   if (Platform.OS === 'web') { localStorage.removeItem(API_KEY_STORAGE_KEY); return; }
   return SecureStore.deleteItemAsync(API_KEY_STORAGE_KEY);
 }
@@ -61,50 +52,8 @@ const SYNCED_TABLES = ['trips', 'homes', 'groups', 'friends', 'split_records', '
 export default function SettingsScreen() {
   const { clearHistory } = useSplitStore();
 
-  const [apiKey, setApiKey] = useState('');
-  const [savedApiKey, setSavedApiKey] = useState('');
-  const [apiSaved, setApiSaved] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-
-  const [usesSharedKey, setUsesSharedKey] = useState(false);
-  const [showCodeField, setShowCodeField] = useState(false);
-  const [inviteCode, setInviteCode] = useState('');
-  const [redeeming, setRedeeming] = useState(false);
-  const [redeemError, setRedeemError] = useState<string | null>(null);
-
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  useEffect(() => {
-    getApiKey().then((k) => { if (k) { setApiKey(k); setSavedApiKey(k); } });
-    getStorageItem(PROFILE_USES_SHARED_KEY).then((v) => { if (v === '1') setUsesSharedKey(true); });
-  }, []);
-
-  const handleRedeemCode = async () => {
-    const trimmed = inviteCode.trim();
-    if (!trimmed || redeeming) return;
-    setRedeemError(null);
-    setRedeeming(true);
-    const { error } = await supabase.functions.invoke('redeem-family-code', { body: { code: trimmed } });
-    setRedeeming(false);
-    if (error) { setRedeemError('That code isn’t valid.'); return; }
-    await setStorageItem(PROFILE_USES_SHARED_KEY, '1');
-    setUsesSharedKey(true);
-    setShowCodeField(false);
-    setInviteCode('');
-    successHaptic();
-  };
-
-  const handleSaveApiKey = async () => {
-    const trimmed = apiKey.trim();
-    if (!trimmed.startsWith('sk-ant-')) { setApiError('API keys must start with sk-ant-'); return; }
-    setApiError(null);
-    await saveApiKey(trimmed);
-    successHaptic();
-    setSavedApiKey(trimmed);
-    setApiSaved(true);
-    setTimeout(() => setApiSaved(false), 1800);
-  };
 
   const handleDeleteAccount = async () => {
     mediumHaptic();
@@ -131,11 +80,8 @@ export default function SettingsScreen() {
     clearHistory();
     await removeStorageItem(PROFILE_USERNAME_KEY);
     await removeStorageItem(PROFILE_PHOTO_KEY);
-    await removeStorageItem(PROFILE_USES_SHARED_KEY);
+    await removeStorageItem('profile_uses_shared_key');
     await removeApiKey();
-    setApiKey('');
-    setSavedApiKey('');
-    setUsesSharedKey(false);
     setDeleteConfirmVisible(false);
   };
 
@@ -147,67 +93,6 @@ export default function SettingsScreen() {
         headerStyle: { backgroundColor: C.bg },
       }} />
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-
-        {/* API Key */}
-        <SectionLabel style={{ marginBottom: 8 }}>RECEIPT SCANNING</SectionLabel>
-        {usesSharedKey ? (
-          <Card row={false} padding={16} style={{ marginBottom: 24, gap: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <CheckCircleIcon color={C.success} size={18} filled fillColor={C.successBg} />
-              <Text style={s.apiInfo}>You're using a shared key — no setup needed.</Text>
-            </View>
-            <Text style={s.apiHint}>Someone invited you to scan receipts with their key. You won't need your own.</Text>
-          </Card>
-        ) : (
-          <Card row={false} padding={16} style={{ marginBottom: 24, gap: 10 }}>
-            <Text style={s.apiInfo}>
-              Tab Rat uses Claude AI to read receipts. Your key is stored on-device only.
-            </Text>
-            <Input
-              style={s.apiInput}
-              value={apiKey}
-              onChangeText={(t) => { setApiKey(t); setApiSaved(false); }}
-              placeholder="sk-ant-..."
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholderTextColor={C.textDim}
-            />
-            {apiError && <Text style={s.errorText}>{apiError}</Text>}
-            <Button
-              variant="primary"
-              label={apiSaved ? 'Saved!' : 'Save Key'}
-              icon={<KeyIcon color={C.text} size={16} />}
-              onPress={handleSaveApiKey}
-              disabled={apiKey.trim() === savedApiKey.trim()}
-            />
-            <Text style={s.apiHint}>Get a key at console.anthropic.com</Text>
-
-            {showCodeField ? (
-              <View style={{ gap: 8, marginTop: 4 }}>
-                <Input
-                  style={s.apiInput}
-                  value={inviteCode}
-                  onChangeText={(t) => { setInviteCode(t); setRedeemError(null); }}
-                  placeholder="Invite code"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  placeholderTextColor={C.textDim}
-                  onSubmitEditing={handleRedeemCode}
-                  returnKeyType="done"
-                />
-                {redeemError && <Text style={s.errorText}>{redeemError}</Text>}
-                <Button
-                  variant="secondary"
-                  label={redeeming ? 'Checking…' : 'Redeem'}
-                  onPress={handleRedeemCode}
-                  disabled={!inviteCode.trim() || redeeming}
-                />
-              </View>
-            ) : (
-              <Button variant="tertiary" label="Have an invite code?" onPress={() => { selectionHaptic(); setShowCodeField(true); }} />
-            )}
-          </Card>
-        )}
 
         {/* Danger zone */}
         <SectionLabel style={{ marginBottom: 8 }}>DANGER ZONE</SectionLabel>
@@ -246,9 +131,6 @@ const s = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 16, gap: 0 },
 
-  apiInfo: { ...Type.cardDesc, color: C.textSub, lineHeight: 20 },
-  apiInput: {},
-  apiHint: { ...Type.cardDesc, color: C.textDim, textAlign: 'center' },
   errorText: { color: C.error, ...Type.cardDesc },
 
   dangerLabel: { flex: 1, ...Type.cardTitle, color: C.error },

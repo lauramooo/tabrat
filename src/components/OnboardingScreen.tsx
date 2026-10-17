@@ -9,7 +9,7 @@ import { PressBtn } from '@/components/PressBtn';
 import { ProfilePhotoButton } from '@/components/ProfilePhotoButton';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
-import { CURRENCIES, PROFILE_HANDLE_KEY, PROFILE_PHOTO_KEY, PROFILE_USERNAME_KEY, PROFILE_USES_SHARED_KEY, setStorageItem } from '@/app/settings';
+import { CURRENCIES, PROFILE_HANDLE_KEY, PROFILE_PHOTO_KEY, PROFILE_USERNAME_KEY, setStorageItem } from '@/app/settings';
 import { supabase } from '@/lib/supabase';
 import { useSplitStore } from '@/store/useSplitStore';
 import { errorMessage } from '@/utils/errors';
@@ -28,7 +28,6 @@ export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
   const [handle, setHandle] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [currency, setCurrency] = useState('USD');
-  const [inviteCode, setInviteCode] = useState('');
   const [currencyPickerVisible, setCurrencyPickerVisible] = useState(false);
   const [photoSheetVisible, setPhotoSheetVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -106,14 +105,6 @@ export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
       if (photoUri) await setStorageItem(PROFILE_PHOTO_KEY, photoUri);
       setDefaultCurrency(currency);
 
-      // Best-effort — a mistyped/invalid code shouldn't block finishing onboarding, it just
-      // means they'll bring their own key later like anyone else.
-      const trimmedInviteCode = inviteCode.trim();
-      if (trimmedInviteCode) {
-        const { error: redeemError } = await supabase.functions.invoke('redeem-family-code', { body: { code: trimmedInviteCode } });
-        if (!redeemError) await setStorageItem(PROFILE_USES_SHARED_KEY, '1');
-      }
-
       mediumHaptic();
       onComplete();
     } catch (e) {
@@ -160,17 +151,6 @@ export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
               <MoneyIcon size={14} color={C.textSub} />
               <Text style={s.currencyRowText}>{CURRENCIES.find((c) => c.code === currency)?.name ?? currency} ({currency})</Text>
             </PressBtn>
-          </View>
-
-          <View style={{ gap: 6, marginTop: 16 }}>
-            <FieldLabel style={{ marginBottom: 0 }}>INVITE CODE (OPTIONAL)</FieldLabel>
-            <Input
-              value={inviteCode}
-              onChangeText={setInviteCode}
-              placeholder="Have a code from a rat?"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
           </View>
 
           {error && <Text style={s.errorText}>{error}</Text>}
