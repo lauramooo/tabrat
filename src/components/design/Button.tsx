@@ -27,7 +27,7 @@ export function Button({
   };
   const sizeStyle: ViewStyle =
     size === 'small' ? { paddingHorizontal: 12, height: 32, borderRadius: Radius.pill }
-    : { alignSelf: 'stretch', height: BIG_HEIGHT, borderRadius: Radius.pill };
+    : { alignSelf: 'stretch', height: BIG_HEIGHT, borderRadius: Radius.pill, paddingHorizontal: Spacing.md };
 
   let bg = 'transparent';
   let textColor: string = C.text;
@@ -95,7 +95,17 @@ export function Button({
             ...(effectiveVariant === 'inactive' ? { color: textColor } : null),
           })
         : icon}
-      <Text style={[baseTextStyle, { color: textColor }, bold && { fontFamily: 'Poppins_700Bold' }]}>{toSentenceCase(label)}</Text>
+      {/* The pill has a fixed height, so a label can't wrap or grow unbounded with the system text
+          size — side-by-side buttons on a small screen spilled their labels outside the pill. */}
+      <Text
+        style={[baseTextStyle, { color: textColor, flexShrink: 1 }, bold && { fontFamily: 'Poppins_700Bold' }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        maxFontSizeMultiplier={1.3}
+      >
+        {toSentenceCase(label)}
+      </Text>
     </PressBtn>
   );
 }
