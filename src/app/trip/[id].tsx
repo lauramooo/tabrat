@@ -15,7 +15,7 @@ import { GroupHeader } from '@/components/GroupHeader';
 import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
 import { takeGroupEditRequest } from '@/utils/pendingGroupEdit';
 import { QuickAddBar } from '@/components/QuickAddBar';
-import { Button, Card, EmptyHint, EmptyPie, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, CurrencyPickerList, DateRangeField, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, IconBadge, Input, PayModal, RunningTotalsCard, SearchInput, SettlementRow } from '@/components/design';
+import { Button, Card, EmptyHint, EmptyPie, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, CurrencyPickerList, DateRangeField, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, IconBadge, Input, PayModal, RunningTotalsCard, SearchInput, SettlementRow, KeyboardAwareScrollView, DROPDOWN_REVEAL } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
@@ -238,7 +238,7 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
       onClose={onClose}
       title={<EditableTitle key={titleKey} value={name} onChangeText={setName} placeholder="Trip name" fallback="Trip" />}
     >
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: SCREEN_H * 0.6 }}>
+      <KeyboardAwareScrollView revealBelow={DROPDOWN_REVEAL} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: SCREEN_H * 0.6 }}>
         <FieldLabel>DATES</FieldLabel>
         <DateRangeField
           startDate={startDate}
@@ -452,7 +452,7 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
           </View>
         </Card>
         <View style={{ height: 4 }} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
       <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
         <Button variant="secondary" size="small" label="Cancel" onPress={onClose} />
         <Button variant="primary" size="small" label="Save"

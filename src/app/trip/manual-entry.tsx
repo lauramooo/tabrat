@@ -6,7 +6,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActionSheetIOS, Alert, Platform, Pressable } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Card, CenteredModal, CircleIconButton, DateRangeField, Dropdown, DropdownRow, FieldLabel, Input } from '@/components/design';
+import { Button, Card, CenteredModal, CircleIconButton, DateRangeField, Dropdown, DropdownRow, FieldLabel, Input, KeyboardAwareScrollView } from '@/components/design';
 import { CameraIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, PencilIcon, PlusCircleIcon, SearchIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
@@ -244,14 +244,9 @@ export default function ManualEntryScreen() {
         <CircleIconButton variant="close" size={22} color={C.text} onPress={goBack} />
       </View>
 
-      {/* No KeyboardAvoidingView here — it was fighting the ScrollView's own native "scroll the
-          focused field into view" behavior on iOS, and the combination could collapse the whole
-          scroll area to almost nothing when the keyboard opened (the same failure mode found and
-          fixed the same way in AuthGate.tsx earlier). The plain ScrollView already lifts whatever
-          field is focused just above the keyboard on its own. */}
       <View style={{ flexShrink: 1 }}>
         <View style={{ flexShrink: 1, position: 'relative' }}>
-        <ScrollView style={s.scroll} contentContainerStyle={s.content} automaticallyAdjustKeyboardInsets
+        <KeyboardAwareScrollView style={s.scroll} contentContainerStyle={s.content}
           keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
           {/* -- Name -- */}
@@ -440,7 +435,7 @@ export default function ManualEntryScreen() {
           )}
 
           <View style={{ height: 16 }} />
-        </ScrollView>
+        </KeyboardAwareScrollView>
         <LinearGradient colors={[`${C.bg}00`, C.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28, pointerEvents: 'none' }} />
         </View>
 

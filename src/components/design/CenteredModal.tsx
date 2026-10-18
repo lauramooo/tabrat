@@ -1,6 +1,7 @@
 import { cloneElement, isValidElement } from 'react';
 import { Modal, Pressable, StyleSheet, TextStyle, View } from 'react-native';
 import { CircleIconButton } from './CircleIconButton';
+import { ModalBackdrop } from './ModalBackdrop';
 import { C } from '@/constants/colors';
 import { Radius, Spacing } from '@/constants/spacing';
 
@@ -31,7 +32,7 @@ export function CenteredModal({
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={s.backdrop} onPress={onClose}>
+      <ModalBackdrop style={s.backdrop} onPress={onClose}>
         <Pressable style={[s.card, { maxWidth, padding, borderRadius: radius }]} onPress={() => {}}>
           {(title || showClose) && (
             <View style={s.headerRow}>
@@ -43,13 +44,14 @@ export function CenteredModal({
           )}
           {children}
         </Pressable>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }
 
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  card: { backgroundColor: C.bg, width: '100%', gap: 12 },
+  // flexShrink so the card (and the KeyboardAwareScrollView inside it) fits the space above the keyboard.
+  card: { flexShrink: 1, backgroundColor: C.bg, width: '100%', gap: 12 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });

@@ -2,9 +2,9 @@ import { PressBtn } from '@/components/PressBtn';
 import { CheckCircleIcon, PencilIcon, PlusIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card, Divider, FieldLabel, Input } from '@/components/design';
+import { Button, Card, Divider, FieldLabel, Input, KeyboardAwareScrollView } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
@@ -40,8 +40,8 @@ export default function EditCategoriesScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+      <View style={{ flex: 1 }}>
+        <KeyboardAwareScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
           <Text style={s.hint}>
             Add categories here or add them as you enter expenses.
@@ -133,8 +133,8 @@ export default function EditCategoriesScreen() {
             onPress={() => router.back()}
             style={{ marginTop: 4 }}
           />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
+      </View>
     </SafeAreaView>
   );
 }

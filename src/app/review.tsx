@@ -6,7 +6,7 @@ import { useRef, useState } from 'react';
 import { Animated, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, CenteredModal, FieldLabel, Input } from '@/components/design';
+import { Button, CenteredModal, FieldLabel, Input, KeyboardAwareScrollView } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
@@ -501,13 +501,8 @@ export default function ReviewScreen() {
       <FlowSteps active={0} />
 
       {/* -- Main scroll -- */}
-      {/* No KeyboardAvoidingView — it fights the ScrollView's own native "scroll the focused
-          field into view" behavior on iOS and can collapse the whole scroll area to almost
-          nothing when the keyboard opens (see manual-entry.tsx and AuthGate.tsx for the same
-          failure mode and fix). The plain scroll container already lifts the focused field on
-          its own. */}
       <View style={{ flex: 1 }}>
-        <ScrollContainer style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollView component={ScrollContainer} style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
           {/* Line items */}
           <Text style={s.sectionLabel}>LINE ITEMS</Text>
@@ -558,10 +553,10 @@ export default function ReviewScreen() {
               <FieldLabel>Tip</FieldLabel>
               <View style={s.ttRow}>
                 <View style={s.ttCol1}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={s.ttPresetRow}>
                     {[15, 18, 20, 25].map((pct) => (
                       <PressBtn key={pct} style={[s.ttPreset, activeTipPct === pct && s.ttPresetActive]} onPress={() => selectPreset(pct)}>
-                        <Text style={[s.ttPresetText, activeTipPct === pct && s.ttPresetTextActive]}>{pct}%</Text>
+                        <Text style={[s.ttPresetText, activeTipPct === pct && s.ttPresetTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{pct}%</Text>
                       </PressBtn>
                     ))}
                   </View>
@@ -619,7 +614,7 @@ export default function ReviewScreen() {
           </View>
 
           <View style={{ height: 8 }} />
-        </ScrollContainer>
+        </KeyboardAwareScrollView>
 
         {error ? <Text style={s.errorText}>{error}</Text> : null}
 
@@ -694,6 +689,8 @@ const s = StyleSheet.create({
   ttBoxFocused: { borderColor: C.primary },
   ttPrefix: { color: C.textSub, ...Type.bodySmall },
   ttInput: { flex: 1, color: C.text, ...Type.bodySmall, padding: 0, minWidth: 0 },
+  // Same height as the tip $ input beside it, so the preset circles sit centered on its midline.
+  ttPresetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: InputMetrics.height },
   ttPreset: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   ttPresetActive: { backgroundColor: C.yellow },
   ttPresetText: { color: C.textSub, ...Type.pillLabel },

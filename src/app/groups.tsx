@@ -3,10 +3,10 @@ import { PressBtn } from '@/components/PressBtn';
 import { PencilIcon, PlusIcon, TrashIcon, UserMultipleIcon } from '@/components/FigmaIcons';
 import { PersonChip } from '@/components/PersonChip';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card, CircleIconButton, FieldLabel, IconBadge, Input } from '@/components/design';
+import { Button, Card, CircleIconButton, FieldLabel, IconBadge, Input, ModalBackdrop, KeyboardAwareScrollView } from '@/components/design';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
@@ -96,14 +96,14 @@ function GroupModal({ visible, onClose, editGroup }: GroupModalProps) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={s.modalBackdrop} onPress={onClose}>
+      <ModalBackdrop style={s.modalBackdrop} onPress={onClose}>
         <Pressable style={s.modalSheet} onPress={() => {}}>
           <View style={s.modalHeaderRow}>
             <Text style={s.modalTitle}>{editGroup ? 'Edit group' : 'New group'}</Text>
             <CircleIconButton variant="close" size={22} color={C.text} onPress={onClose} />
           </View>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 20 }}>
+          <>
+            <KeyboardAwareScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 20 }}>
               {/* Group name */}
               <View style={{ gap: 6 }}>
                 <FieldLabel style={{ marginBottom: 0 }}>GROUP NAME</FieldLabel>
@@ -178,10 +178,10 @@ function GroupModal({ visible, onClose, editGroup }: GroupModalProps) {
                 <Button variant="secondary" size="small" label="Cancel" onPress={onClose} />
                 <Button variant="primary" size="small" label="Save Group" onPress={handleSave} />
               </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
+            </KeyboardAwareScrollView>
+          </>
         </Pressable>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }
@@ -318,7 +318,7 @@ const s = StyleSheet.create({
 
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 20 },
-  modalSheet: {
+  modalSheet: { flexShrink: 1,
     backgroundColor: C.bg, borderRadius: 20,
     paddingHorizontal: 20, paddingVertical: 24, maxHeight: '88%',
   },

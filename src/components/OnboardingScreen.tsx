@@ -1,8 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, CenteredModal, CircleIconButton, Divider, FieldLabel, Input } from '@/components/design';
+import { Button, CenteredModal, CircleIconButton, Divider, FieldLabel, Input, KeyboardAwareScrollView } from '@/components/design';
 import { CameraIcon, CheckCircleIcon, MoneyIcon, PhotoIcon, TrashIcon } from '@/components/FigmaIcons';
 import { PressBtn } from '@/components/PressBtn';
 import { ProfilePhotoButton } from '@/components/ProfilePhotoButton';
@@ -116,8 +116,8 @@ export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
 
   return (
     <SafeAreaView style={s.safe}>
-      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+      <View style={s.flex}>
+        <KeyboardAwareScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
           <View style={s.headerRow}>
             <CircleIconButton variant="back" size={28} color={C.primary} onPress={handleBack} />
             <Text style={s.title}>Set up your profile</Text>
@@ -163,8 +163,8 @@ export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
             disabled={loading || !canContinue}
             style={{ marginTop: 24 }}
           />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
+      </View>
 
       {/* Photo action sheet — same options as the Account screen's profile photo picker */}
       <CenteredModal visible={photoSheetVisible} onClose={() => setPhotoSheetVisible(false)} padding={24} title={<Text style={s.sheetTitle}>Profile photo</Text>}>

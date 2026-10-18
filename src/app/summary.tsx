@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Portal, Snackbar } from 'react-native-paper';
 import { ActionPill } from '@/components/ActionPill';
 import { Avatar } from '@/components/Avatar';
-import { Button, Card, CenteredModal, CircleIconButton, Divider, Dropdown, DropdownRow } from '@/components/design';
+import { Button, Card, CenteredModal, CircleIconButton, Divider, Dropdown, DropdownRow, ModalBackdrop } from '@/components/design';
 import { CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, ReopenIcon, SendIcon } from '@/components/FigmaIcons';
 import { captureRef } from 'react-native-view-shot';
 import { BillHeader, FlowSteps } from '@/components/FlowSteps';
@@ -196,7 +196,7 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, joi
         </View>
       </View>
 
-      <Pressable style={st.modalBackdrop} onPress={onClose}>
+      <ModalBackdrop style={st.modalBackdrop} onPress={onClose}>
         <Pressable style={[st.modalCard, { padding: 20, gap: 14, maxHeight: '85%' }]} onPress={() => {}}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={st.modalTitle}>Share summary</Text>
@@ -246,7 +246,7 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, joi
             style={{ alignSelf: 'flex-end' }}
           />
         </Pressable>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }
@@ -635,7 +635,7 @@ const st = StyleSheet.create({
 
   // Modal shell (also used by ShareImageModal)
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 32 },
-  modalCard: { backgroundColor: C.bg, borderRadius: 20, padding: 24, width: '100%', gap: 12 },
+  modalCard: { flexShrink: 1, backgroundColor: C.bg, borderRadius: 20, padding: 24, width: '100%', gap: 12 },
   modalTitle: { ...Type.h2, color: C.text, lineHeight: 26 },
   modalPersonName: { ...Type.cardTitle, color: C.text },
   modalPersonSub: { ...Type.cardDesc, color: C.textSub, marginTop: 1 },

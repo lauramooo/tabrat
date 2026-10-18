@@ -4,6 +4,8 @@ export { SectionLabel, FieldLabel } from './SectionLabel';
 export { Button } from './Button';
 export type { ButtonVariant, ButtonSize } from './Button';
 export { CenteredModal } from './CenteredModal';
+export { ModalBackdrop } from './ModalBackdrop';
+export { KeyboardAwareScrollView, DROPDOWN_REVEAL } from './KeyboardAwareScrollView';
 export { ConfirmModal } from './ConfirmModal';
 export { DatePickerModal } from './DatePickerModal';
 export { DateRangeCalendarModal } from './DateRangeCalendarModal';

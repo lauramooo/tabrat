@@ -72,6 +72,7 @@ The root `Stack` (`src/app/_layout.tsx`) defaults every screen to a fully transp
 ## Key conventions
 
 - Import `Text` and `TextInput` from `@/components/design/Text`, never from `react-native-paper` / `react-native` directly — those wrappers cap how far text grows with the system text-size setting (`MAX_FONT_SCALE`), which layouts sized for default text depend on
+- Keyboard handling is shared, never per-screen: any scroll area containing text fields is a `KeyboardAwareScrollView` (pass `revealBelow={DROPDOWN_REVEAL}` when a field opens a suggestions list below it), and every pop-up's backdrop is `ModalBackdrop` (built into `CenteredModal`), which lifts the card above the keyboard — don't add `KeyboardAvoidingView` or `automaticallyAdjustKeyboardInsets`
 - All colors come from `src/constants/colors.ts` (`C.bg`, `C.primary`, etc.) — never hardcode hex values
 - Path alias `@/` maps to `src/` (configured in `tsconfig.json`)
 - `SafeAreaView` from `react-native-safe-area-context` with `edges={['bottom']}` on every screen — the Stack header handles top safe area

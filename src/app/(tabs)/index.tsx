@@ -8,7 +8,7 @@ import {
 import { ActionPill } from '@/components/ActionPill';
 import { Avatar } from '@/components/Avatar';
 import { BillTypeIcon, CalendarIcon, CheckCircleIcon, CircleIcon, CloseCircleIcon, EmptyStateIcon, HomeTypeIcon, PlusIcon, ProgressIcon, ReopenIcon, TrashIcon, TripTypeIcon } from '@/components/FigmaIcons';
-import { Button, Card, CircleIconButton, ConfirmModal, DatePickerModal, DateRangeCalendarModal, EditableTitle, FieldLabel, IconBadge, SearchInput, SectionLabel } from '@/components/design';
+import { Button, Card, CircleIconButton, ConfirmModal, DatePickerModal, DateRangeCalendarModal, EditableTitle, FieldLabel, IconBadge, SearchInput, SectionLabel, ModalBackdrop } from '@/components/design';
 import { JoinCodeModal } from '@/components/JoinCodeModal';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -105,7 +105,7 @@ function QuickEditModal({ item, onClose }: { item: SplitRecord; onClose: () => v
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={qst.backdrop} onPress={onClose}>
+      <ModalBackdrop style={qst.backdrop} onPress={onClose}>
         <Pressable style={qst.card} onPress={() => {}}>
           <View style={qst.topRow}>
             <EditableTitle value={name} onChangeText={commitName} placeholder="Bill title" fallback="Receipt" />
@@ -191,7 +191,7 @@ function QuickEditModal({ item, onClose }: { item: SplitRecord; onClose: () => v
             />
           )}
         </Pressable>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }
@@ -261,7 +261,7 @@ function TripQuickModal({ trip, onClose }: { trip: Trip; onClose: () => void }) 
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={qst.backdrop} onPress={onClose}>
+      <ModalBackdrop style={qst.backdrop} onPress={onClose}>
         <Pressable style={qst.card} onPress={() => {}}>
           <View style={qst.topRow}>
             <EditableTitle value={name} onChangeText={commitName} placeholder="Trip name" fallback="Trip" />
@@ -315,7 +315,7 @@ function TripQuickModal({ trip, onClose }: { trip: Trip; onClose: () => void }) 
             onClose={() => setDateModalOpen(false)}
           />
         </Pressable>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }
@@ -914,7 +914,7 @@ export default function FeedScreen() {
 
 const qst = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  card: { backgroundColor: C.bg, borderRadius: 20, padding: 20, width: '100%', maxWidth: 420, gap: 12 },
+  card: { flexShrink: 1, backgroundColor: C.bg, borderRadius: 20, padding: 20, width: '100%', maxWidth: 420, gap: 12 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2, gap: 8 },
   datePillWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

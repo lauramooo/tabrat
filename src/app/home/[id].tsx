@@ -13,7 +13,7 @@ import { GroupHeader, HeaderMonthPicker } from '@/components/GroupHeader';
 import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
 import { takeGroupEditRequest } from '@/utils/pendingGroupEdit';
 import { QuickAddBar } from '@/components/QuickAddBar';
-import { Button, Card, EmptyHint, EmptyPie, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, DatePickerModal, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, Input, PayModal, RunningTotalsCard, SectionLabel, SettlementRow } from '@/components/design';
+import { Button, Card, EmptyHint, EmptyPie, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, DatePickerModal, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, Input, PayModal, RunningTotalsCard, SectionLabel, SettlementRow, ModalBackdrop, KeyboardAwareScrollView } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
@@ -296,13 +296,13 @@ function EditHomeModal({
   return (
     <>
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={s.modalBackdrop} onPress={onClose}>
+      <ModalBackdrop style={s.modalBackdrop} onPress={onClose}>
         <Pressable style={s.modalSheet} onPress={() => {}}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
             <EditableTitle value={name} onChangeText={setName} placeholder="Home name" fallback="Home" />
             <CircleIconButton variant="close" size={20} color={C.text} onPress={onClose} />
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <KeyboardAwareScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             <FieldLabel style={{ marginBottom: 6 }}>DATES</FieldLabel>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
@@ -404,7 +404,7 @@ function EditHomeModal({
             </Card>
 
             <View style={{ height: 4 }} />
-          </ScrollView>
+          </KeyboardAwareScrollView>
           <View style={{ flexDirection: 'row', gap: 10, paddingTop: 8, justifyContent: 'flex-end' }}>
             <Button variant="secondary" size="small" label="Cancel" onPress={onClose} />
             <Button variant="primary" size="small" label="Save"
@@ -412,7 +412,7 @@ function EditHomeModal({
             />
           </View>
         </Pressable>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
     <ConfirmModal
       visible={!!deleteCatConfirm}
@@ -930,7 +930,7 @@ const s = StyleSheet.create({
 
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
-  modalSheet: { backgroundColor: C.bg, borderRadius: 20, padding: 20, maxHeight: '88%' },
+  modalSheet: { flexShrink: 1, backgroundColor: C.bg, borderRadius: 20, padding: 20, maxHeight: '88%' },
   modalTitle: { ...Type.h2, color: C.text, marginBottom: 12 },
 
   // Edit modal — mirrors trip/[id].tsx exactly

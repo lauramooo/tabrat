@@ -3,12 +3,9 @@ import { ChevronDownCircleIcon, ChevronUpCircleIcon, HomeTypeIcon, PlusCircleIco
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import {
-  Platform, ScrollView, StyleSheet,
-  View,
-} from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Dropdown, DropdownRow, FieldLabel, Input, SearchInput } from '@/components/design';
+import { Button, Dropdown, DropdownRow, FieldLabel, Input, SearchInput, KeyboardAwareScrollView, DROPDOWN_REVEAL } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
@@ -89,12 +86,8 @@ export default function NewHomeScreen() {
         headerStyle: { backgroundColor: C.bg },
         headerTitleStyle: { ...Type.h2, color: C.text },
       }} />
-      {/* No KeyboardAvoidingView — it fights the ScrollView's own native "scroll the focused
-          field into view" behavior on iOS and can collapse the whole scroll area to almost
-          nothing when the keyboard opens (see manual-entry.tsx and AuthGate.tsx for the same
-          failure mode and fix). */}
       <View style={{ flex: 1 }}>
-      <ScrollView
+      <KeyboardAwareScrollView revealBelow={DROPDOWN_REVEAL}
         contentContainerStyle={s.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -178,7 +171,7 @@ export default function NewHomeScreen() {
         </View>
 
         {error && <Text style={s.errorText}>{error}</Text>}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <View style={s.footer}>
         <Button

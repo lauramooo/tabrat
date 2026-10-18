@@ -4,7 +4,7 @@ import { createElement, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { Image, Modal, Platform, Pressable, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, CircleIconButton, ConfirmModal, EditableTitle } from '@/components/design';
+import { Button, CircleIconButton, ConfirmModal, EditableTitle, ModalBackdrop } from '@/components/design';
 import { ShareCodeModal } from '@/components/ShareCodeModal';
 import {
   CalendarIcon, CheckCircleIcon, FriendsIcon, ItemsIcon, MoreIcon, PencilIcon, ReceiptIcon, ScissorIcon, SendIcon, TagIcon, TrashIcon,
@@ -151,7 +151,7 @@ export function BillHeader() {
 
       {/* Actions menu — Apple-style dropdown from header button */}
       <Modal visible={actionsModal} transparent animationType="fade" onRequestClose={() => setActionsModal(false)}>
-        <Pressable style={styles.actionsBackdrop} onPress={() => setActionsModal(false)}>
+        <ModalBackdrop style={styles.actionsBackdrop} onPress={() => setActionsModal(false)}>
           <View style={[styles.actionsCard, { top: actionsTop }]}>
             <PressBtn style={styles.actionsRow} onPress={() => { setActionsModal(false); openEdit(); }} activeOpacity={0.6}>
               <PencilIcon color={C.textSub} size={17} />
@@ -172,7 +172,7 @@ export function BillHeader() {
               <Text style={[styles.actionsRowText, { color: C.error }]}>Delete</Text>
             </PressBtn>
           </View>
-        </Pressable>
+        </ModalBackdrop>
       </Modal>
 
       <ShareCodeModal
@@ -185,7 +185,7 @@ export function BillHeader() {
 
       {/* Edit bill modal */}
       <Modal visible={editModal} transparent animationType="fade" onRequestClose={() => setEditModal(false)}>
-        <Pressable style={styles.bhBackdrop} onPress={() => setEditModal(false)}>
+        <ModalBackdrop style={styles.bhBackdrop} onPress={() => setEditModal(false)}>
           <Pressable style={styles.bhCard} onPress={() => {}}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <EditableTitle key={titleKey} value={editName} onChangeText={setEditName} placeholder="Bill title" fallback="Bill" />
@@ -241,7 +241,7 @@ export function BillHeader() {
               <Button variant="primary" size="small" label="Save" onPress={() => { setRestaurantName(editName); if (editDate) setReceiptDate(editDate); setEditModal(false); }} />
             </View>
           </Pressable>
-        </Pressable>
+        </ModalBackdrop>
       </Modal>
 
       {/* Delete confirmation */}
@@ -257,7 +257,7 @@ export function BillHeader() {
 
       {/* Receipt preview */}
       <Modal visible={showReceiptModal} transparent animationType="fade" onRequestClose={() => setShowReceiptModal(false)}>
-        <Pressable style={styles.receiptOverlay} onPress={() => setShowReceiptModal(false)}>
+        <ModalBackdrop style={styles.receiptOverlay} onPress={() => setShowReceiptModal(false)}>
           <Pressable style={styles.receiptSheet} onPress={() => {}}>
             <CircleIconButton variant="close" size={22} color="#fff" onPress={() => setShowReceiptModal(false)} style={styles.receiptClose} />
             {imageUri ? (
@@ -269,7 +269,7 @@ export function BillHeader() {
               </View>
             )}
           </Pressable>
-        </Pressable>
+        </ModalBackdrop>
       </Modal>
     </>
   );
@@ -314,7 +314,7 @@ export function ReceiptHeader({ editableName }: { editableName?: boolean } = {})
 
       {/* Receipt image modal */}
       <Modal visible={showReceipt} transparent animationType="fade" onRequestClose={() => setShowReceipt(false)}>
-        <Pressable style={styles.receiptOverlay} onPress={() => setShowReceipt(false)}>
+        <ModalBackdrop style={styles.receiptOverlay} onPress={() => setShowReceipt(false)}>
           <Pressable style={styles.receiptSheet} onPress={() => {}}>
             <CircleIconButton variant="close" size={22} color="#fff" onPress={() => setShowReceipt(false)} style={styles.receiptClose} />
             {imageUri ? (
@@ -326,7 +326,7 @@ export function ReceiptHeader({ editableName }: { editableName?: boolean } = {})
               </View>
             )}
           </Pressable>
-        </Pressable>
+        </ModalBackdrop>
       </Modal>
 
       {/* Date pill — web: native date input styled as pill; browser handles picker natively */}
@@ -349,7 +349,7 @@ export function ReceiptHeader({ editableName }: { editableName?: boolean } = {})
           </PressBtn>
           {DateTimePicker && (
             <Modal visible={showPicker} transparent animationType="fade" onRequestClose={() => setShowPicker(false)}>
-              <Pressable style={styles.pickerBackdrop} onPress={() => setShowPicker(false)}>
+              <ModalBackdrop style={styles.pickerBackdrop} onPress={() => setShowPicker(false)}>
                 <Pressable style={styles.pickerSheet} onPress={() => {}}>
                   <DateTimePicker
                     value={parsedDate}
@@ -368,7 +368,7 @@ export function ReceiptHeader({ editableName }: { editableName?: boolean } = {})
                     </PressBtn>
                   )}
                 </Pressable>
-              </Pressable>
+              </ModalBackdrop>
             </Modal>
           )}
         </>
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   bhDate: { ...Type.cardDesc, color: C.textSub },
   bhBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: C.primaryDim, justifyContent: 'center', alignItems: 'center' },
   bhBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  bhCard: { backgroundColor: C.bg, borderRadius: 20, padding: 20, width: '100%', gap: 12 },
+  bhCard: { flexShrink: 1, backgroundColor: C.bg, borderRadius: 20, padding: 20, width: '100%', gap: 12 },
   bhFieldLabel: { ...Type.fieldLabel, color: C.textSub },
   actionsBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
   actionsCard: {

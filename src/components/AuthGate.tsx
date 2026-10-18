@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Keyboard, ScrollView, StyleSheet, View } from 'react-native';
+import { Keyboard, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Divider, FieldLabel, Input } from '@/components/design';
+import { Button, Divider, FieldLabel, Input, KeyboardAwareScrollView } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { AppleLogoIcon, EyeIcon, EyeOffIcon, GoogleLogoIcon, HandCardLeft, HandCardRight } from '@/components/FigmaIcons';
@@ -65,7 +65,7 @@ export function AuthGate() {
 
   return (
     <SafeAreaView style={s.safe}>
-      <ScrollView
+      <KeyboardAwareScrollView
         style={s.flex}
         contentContainerStyle={s.center}
         keyboardShouldPersistTaps="handled"
@@ -166,7 +166,7 @@ export function AuthGate() {
               </View>
             </View>
           </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -1,6 +1,6 @@
 import { PressBtn } from '@/components/PressBtn';
 import { BillTypeIcon, CalendarIcon, CheckCircleIcon, CircleIcon, CloseCircleIcon, EmptyStateIcon, PlusIcon, ProgressIcon, ReopenIcon, SortIcon, TrashIcon, TripTypeIcon } from '@/components/FigmaIcons';
-import { Button, Card, CircleIconButton, ConfirmModal, DatePickerModal, EditableTitle, FieldLabel, IconBadge, SearchInput, SectionLabel } from '@/components/design';
+import { Button, Card, CircleIconButton, ConfirmModal, DatePickerModal, EditableTitle, FieldLabel, IconBadge, SearchInput, SectionLabel, ModalBackdrop } from '@/components/design';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -107,7 +107,7 @@ function TripQuickModal({ trip, onClose }: { trip: Trip; onClose: () => void }) 
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={s.qBackdrop} onPress={onClose}>
+      <ModalBackdrop style={s.qBackdrop} onPress={onClose}>
         <Pressable style={s.qCard} onPress={() => {}}>
           <View style={s.qTopRow}>
             <EditableTitle value={name} onChangeText={commitName} placeholder="Trip name" fallback="Trip" />
@@ -195,7 +195,7 @@ function TripQuickModal({ trip, onClose }: { trip: Trip; onClose: () => void }) 
             </>
           )}
         </Pressable>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }
@@ -451,7 +451,7 @@ const s = StyleSheet.create({
   tripPayLineText: { ...Type.cardDesc, color: C.textDim },
 
   qBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  qCard: { backgroundColor: C.bg, borderRadius: 20, padding: 20, width: '100%', maxWidth: 420, gap: 12 },
+  qCard: { flexShrink: 1, backgroundColor: C.bg, borderRadius: 20, padding: 20, width: '100%', maxWidth: 420, gap: 12 },
   qTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2, gap: 8 },
   qDatePill: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.primaryDim, borderRadius: InputMetrics.radius, height: InputMetrics.height, paddingHorizontal: 12 },
   qDatePillText: { ...Type.labelMedium, color: C.text },

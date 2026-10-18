@@ -6,6 +6,7 @@ import { CheckCircleIcon, MoreIcon, PencilIcon, ReopenIcon, SendIcon, TrashIcon 
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { Text } from '@/components/design/Text';
+import { ModalBackdrop } from '@/components/design';
 
 // The ⋮ header button of a trip or home — shared by its Dashboard and Expenses tabs so the menu
 // is identical on both.
@@ -35,7 +36,7 @@ export function GroupActionsMenu({ visible, onDismiss, closeLabel, closed, onEdi
   const pick = (fn: () => void) => () => { onDismiss(); fn(); };
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
-      <Pressable style={s.backdrop} onPress={onDismiss}>
+      <ModalBackdrop style={s.backdrop} onPress={onDismiss}>
         <View style={[s.card, { top }]}>
           <PressBtn style={s.row} onPress={pick(onEdit)} activeOpacity={0.6}>
             <PencilIcon color={C.textSub} size={17} />
@@ -61,7 +62,7 @@ export function GroupActionsMenu({ visible, onDismiss, closeLabel, closed, onEdi
             <Text style={[s.rowText, { color: C.error }]}>Delete</Text>
           </PressBtn>
         </View>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }

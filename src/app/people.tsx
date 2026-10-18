@@ -2,17 +2,12 @@ import { PressBtn } from '@/components/PressBtn';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BillHeader, FlowSteps } from '@/components/FlowSteps';
 import { ChevronDownCircleIcon, ChevronUpCircleIcon, PlusCircleIcon, TagIcon, UserIcon, UserMultipleIcon } from '@/components/FigmaIcons';
 import { PersonChip } from '@/components/PersonChip';
-import { Button, Dropdown, DropdownRow, FieldLabel, SearchInput } from '@/components/design';
+import { Button, Dropdown, DropdownRow, FieldLabel, SearchInput, KeyboardAwareScrollView, DROPDOWN_REVEAL } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
@@ -104,12 +99,8 @@ export default function PeopleScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <BillHeader />
       <FlowSteps active={1} />
-      {/* No KeyboardAvoidingView — it fights the ScrollView's own native "scroll the focused
-          field into view" behavior on iOS and can collapse the whole scroll area to almost
-          nothing when the keyboard opens (see manual-entry.tsx and AuthGate.tsx for the same
-          failure mode and fix). */}
       <View style={{ flex: 1 }}>
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollView revealBelow={DROPDOWN_REVEAL} style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
           {/* -- Added people as chips -- */}
           {people.length > 0 && (
@@ -191,7 +182,7 @@ export default function PeopleScreen() {
             </View>
           )}
 
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
         <View style={styles.footer}>
           <Button

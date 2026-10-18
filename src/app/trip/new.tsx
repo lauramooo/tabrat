@@ -4,9 +4,9 @@ import { Stack, useRouter } from 'expo-router';
 import { ScreenHeaderTitle } from '@/components/FlowSteps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card, CurrencyPickerList, DateRangeField, Divider, Dropdown, DropdownRow, FieldLabel, Input, SearchInput } from '@/components/design';
+import { Button, Card, CurrencyPickerList, DateRangeField, Divider, Dropdown, DropdownRow, FieldLabel, Input, SearchInput, KeyboardAwareScrollView, DROPDOWN_REVEAL } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { CURRENCIES } from '@/constants/currencies';
@@ -111,12 +111,8 @@ export default function NewTripScreen() {
         // trip[id]/home[id] — inline headerTitle is fine and keeps the header compact.
         headerTitle: () => <ScreenHeaderTitle name={name.trim() || 'New trip'} date={startDate} endDate={endDate} />,
       }} />
-      {/* No KeyboardAvoidingView — it fights the ScrollView's own native "scroll the focused
-          field into view" behavior on iOS and can collapse the whole scroll area to almost
-          nothing when the keyboard opens (see manual-entry.tsx and AuthGate.tsx for the same
-          failure mode and fix). */}
       <View style={{ flex: 1 }}>
-      <ScrollView
+      <KeyboardAwareScrollView revealBelow={DROPDOWN_REVEAL}
         contentContainerStyle={s.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -280,7 +276,7 @@ export default function NewTripScreen() {
         </Card>
 
         {error && <Text style={s.errorText}>{error}</Text>}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <View style={s.footer}>
         <Button

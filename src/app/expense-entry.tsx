@@ -2,11 +2,11 @@ import { PressBtn } from '@/components/PressBtn';
 import { CheckCircleIcon, PencilIcon, PlusIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, CenteredModal, Input } from '@/components/design';
+import { Button, CenteredModal, Input, KeyboardAwareScrollView } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
@@ -253,8 +253,8 @@ export default function ExpenseEntryScreen() {
 
       <FlowSteps active={0} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+      <View style={{ flex: 1 }}>
+        <KeyboardAwareScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
           <Text style={s.sectionLabel}>ITEMS</Text>
           <View style={s.itemList}>
             {items.map((item) => (
@@ -271,14 +271,14 @@ export default function ExpenseEntryScreen() {
           )}
 
           <View style={{ height: 8 }} />
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
         {error ? <Text style={s.errorText}>{error}</Text> : null}
 
         <View style={s.footer}>
           <Button variant="primary" size="big" label="Add People" onPress={handleNext} style={s.nextBtn} />
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       <ItemModal visible={itemModalVisible} editItem={editItem} onClose={() => setItemModalVisible(false)} />
     </SafeAreaView>

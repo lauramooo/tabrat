@@ -7,7 +7,7 @@ import { Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } 
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActionPill } from '@/components/ActionPill';
-import { Button, Card, CenteredModal, CircleIconButton, ConfirmModal, DateRangeField, Dropdown, DropdownRow, FieldLabel, IconBadge, Input, SectionLabel } from '@/components/design';
+import { Button, Card, CenteredModal, CircleIconButton, ConfirmModal, DateRangeField, Dropdown, DropdownRow, FieldLabel, IconBadge, Input, SectionLabel, ModalBackdrop, KeyboardAwareScrollView } from '@/components/design';
 import { GroupHeader, HeaderMonthPicker } from '@/components/GroupHeader';
 import { QuickAddBar } from '@/components/QuickAddBar';
 import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
@@ -107,14 +107,14 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={s.modalBackdrop} onPress={onClose}>
+      <ModalBackdrop style={s.modalBackdrop} onPress={onClose}>
         <Pressable style={s.modalSheet} onPress={() => setCatOpen(false)}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <Text style={[s.modalTitle, { ...Type.cardTitle, marginBottom: 0, lineHeight: 20 }]}>Add expense</Text>
             <CircleIconButton variant="close" size={20} color={C.text} onPress={onClose} />
           </View>
           <View style={{ position: 'relative', flexShrink: 1 }}>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <KeyboardAwareScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             <FieldLabel style={{ marginBottom: 6 }}>NAME</FieldLabel>
             <Card row={false} padding={0} radius={10} style={{ marginBottom: 16, overflow: 'hidden' }}>
@@ -213,7 +213,7 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
 
             {error && <Text style={{ color: C.error, fontSize: 13, fontFamily: 'Poppins_400Regular', marginTop: 12 }}>{error}</Text>}
             <View style={{ height: 16 }} />
-          </ScrollView>
+          </KeyboardAwareScrollView>
           <LinearGradient colors={[`${C.bg}00`, C.bg]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28, pointerEvents: 'none' }} />
           </View>
           <View style={{ flexDirection: 'row', gap: 10, paddingTop: 8, justifyContent: 'flex-end' }}>
@@ -221,7 +221,7 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
             <Button variant="primary" size="small" label="Save" onPress={handleSave} />
           </View>
         </Pressable>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }
@@ -254,7 +254,7 @@ function HomeQuickEditModal({ exp, categories, onClose }: {
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={s.modalBackdrop} onPress={onClose}>
+      <ModalBackdrop style={s.modalBackdrop} onPress={onClose}>
         <Pressable style={s.modalSheet} onPress={() => setCatOpen(false)}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <Text style={[s.modalTitle, { ...Type.cardTitle, marginBottom: 0, lineHeight: 20 }]}>Edit expense</Text>
@@ -320,7 +320,7 @@ function HomeQuickEditModal({ exp, categories, onClose }: {
             <Button variant="primary" size="small" label="Save" onPress={handleSave} />
           </View>
         </Pressable>
-      </Pressable>
+      </ModalBackdrop>
     </Modal>
   );
 }
@@ -734,7 +734,7 @@ export default function HomeExpensesScreen() {
 
       {/* Link bill picker */}
       <Modal visible={importVisible} transparent animationType="fade" onRequestClose={() => setImportVisible(false)}>
-        <Pressable style={s.sheetBackdrop} onPress={() => setImportVisible(false)}>
+        <ModalBackdrop style={s.sheetBackdrop} onPress={() => setImportVisible(false)}>
           <Pressable style={[s.sheetCard, { maxHeight: '75%' }]} onPress={() => {}}>
             <View style={s.importHeader}>
               <Text style={s.sheetTitle}>Link bill</Text>
@@ -767,7 +767,7 @@ export default function HomeExpensesScreen() {
               </ScrollView>
             )}
           </Pressable>
-        </Pressable>
+        </ModalBackdrop>
       </Modal>
     </SafeAreaView>
   );
@@ -820,7 +820,7 @@ const s = StyleSheet.create({
 
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
-  modalSheet: { backgroundColor: C.bg, borderRadius: 20, padding: 20, maxHeight: '88%' },
+  modalSheet: { flexShrink: 1, backgroundColor: C.bg, borderRadius: 20, padding: 20, maxHeight: '88%' },
   modalTitle: { ...Type.h2, color: C.text, marginBottom: 12 },
 
   // Add expense modal
