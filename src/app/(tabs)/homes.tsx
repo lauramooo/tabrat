@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
@@ -18,6 +17,7 @@ import { fmt } from '@/utils/calculator';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import type { Home } from '@/types';
 import { ActionPill } from '@/components/ActionPill';
+import { Text } from '@/components/design/Text';
 
 function HomeRow({ home, onMarkPaid, onReopen, onDelete, monthlyTotal }: {
   home: Home;

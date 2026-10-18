@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, Card, ConfirmModal, IconBadge } from '@/components/design';
 import { BillTypeIcon, CheckCircleIcon, CircleIcon, EmptyStateIcon, PencilIcon, PlusIcon, ProgressIcon, TrashIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
@@ -16,6 +15,7 @@ import { fmt } from '@/utils/calculator';
 import { fmtDate } from '@/utils/date';
 import { ActionPill } from '@/components/ActionPill';
 import type { SplitRecord } from '@/types';
+import { Text } from '@/components/design/Text';
 
 function TabRow({ item, onDeleteRequest }: { item: SplitRecord; onDeleteRequest: () => void }) {
   const { loadSplit } = useSplitStore();

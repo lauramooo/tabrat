@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
 import { Button, CenteredModal } from '@/components/design';
 import { SendIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { mediumHaptic } from '@/utils/haptics';
 import { shareText } from '@/utils/share';
+import { Text } from '@/components/design/Text';
 
 // One shared "share this join code" modal for bills, trips, and homes, so the copy/share
 // treatment never drifts out of sync between the three contexts it's used from.

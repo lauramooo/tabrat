@@ -1,11 +1,12 @@
 import { StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+
 import { AvatarStrip } from '@/components/AvatarStrip';
 import { ScreenHeaderTitle, ScreenSubHeader } from '@/components/FlowSteps';
 import { CircleIconButton, GroupTabs, type GroupTab } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { fmtDate } from '@/utils/date';
+import { Text } from '@/components/design/Text';
 
 // The top of a trip or home: name, a subtitle line, member avatars, then the Dashboard | Expenses
 // chips. Shared by all four tab screens. The subtitle and avatar rows are fixed-height slots

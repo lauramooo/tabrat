@@ -4,12 +4,8 @@ import { Stack, useRouter } from 'expo-router';
 import { ScreenHeaderTitle } from '@/components/FlowSteps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Platform, ScrollView, StyleSheet,
-  TextInput, View,
-} from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, Card, CurrencyPickerList, DateRangeField, Divider, Dropdown, DropdownRow, FieldLabel, Input, SearchInput } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
@@ -20,6 +16,7 @@ import { useSplitStore } from '@/store/useSplitStore';
 import { sanitizeNumberInput } from '@/utils/calculator';
 import { sortWithMeFirst } from '@/utils/sortPeople';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
+import { Text, TextInput } from '@/components/design/Text';
 
 export default function NewTripScreen() {
   const router = useRouter();

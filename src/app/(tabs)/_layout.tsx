@@ -2,7 +2,6 @@ import { PressBtn } from '@/components/PressBtn';
 import { Tabs, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BillTypeIcon, FeedIcon, HomeTypeIcon, PlusIcon, ProfileIcon, TripTypeIcon } from '@/components/FigmaIcons';
@@ -11,6 +10,7 @@ import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
 import { mediumHaptic, selectionHaptic } from '@/utils/haptics';
+import { Text } from '@/components/design/Text';
 
 // -- Tab bar icons — each tab maps straight to its shared FigmaIcons component,
 // so changing an icon there updates the tab bar automatically. --------------
@@ -114,7 +114,7 @@ function CustomTabBar({ state, navigation, onFabPress }: BottomTabBarProps & { o
             >
               <View style={s.tabBtnInner}>
                 <TabIcon name={tab.figmaIcon} color={focused ? C.text : C.textDim} size={22} />
-                <Text style={[s.tabLabel, focused && s.tabLabelActive]}>{tab.label}</Text>
+                <Text style={[s.tabLabel, focused && s.tabLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{tab.label}</Text>
                 {focused && <View style={s.tabIndicator} />}
               </View>
             </PressBtn>

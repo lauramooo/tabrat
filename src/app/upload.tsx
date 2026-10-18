@@ -9,7 +9,6 @@ import {
   StyleSheet, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, CircleIconButton, ConfirmModal } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Radius } from '@/constants/spacing';
@@ -23,6 +22,8 @@ import { parseReceiptViaProxy, UNREADABLE_RECEIPT } from '@/utils/receiptParser'
 import { deleteReceiptImage, readReceiptBase64, resolveReceiptUri, saveReceiptImage } from '@/utils/receiptImage';
 import { errorMessage } from '@/utils/errors';
 import { lightHaptic, mediumHaptic, errorHaptic } from '@/utils/haptics';
+import { Text } from '@/components/design/Text';
+
 // Set once the user OKs sending receipt photos to Anthropic — App Store guideline 5.1.2(i)
 // requires disclosing and getting consent before sharing personal data with a third-party AI.
 const AI_SCAN_CONSENT_KEY = 'ai_scan_consent';

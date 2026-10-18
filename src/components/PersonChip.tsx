@@ -1,8 +1,9 @@
 import { StyleProp, ViewStyle } from 'react-native';
-import { Text } from 'react-native-paper';
+
 import { XMarkIcon } from '@/components/FigmaIcons';
 import { PressBtn } from '@/components/PressBtn';
 import { C, CHIP_PALETTE } from '@/constants/colors';
+import { Text } from '@/components/design/Text';
 
 // Shared person/friend chip: selected = light fill, unselected = no fill — always black stroke + black text.
 export function PersonChip({

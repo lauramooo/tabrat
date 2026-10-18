@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Portal, Snackbar, Text } from 'react-native-paper';
+import { Portal, Snackbar } from 'react-native-paper';
 import { ActionPill } from '@/components/ActionPill';
 import { Avatar } from '@/components/Avatar';
 import { Button, Card, CenteredModal, CircleIconButton, Divider, Dropdown, DropdownRow } from '@/components/design';
@@ -21,6 +21,7 @@ import { fmtDate } from '@/utils/date';
 import { lightHaptic, mediumHaptic, successHaptic } from '@/utils/haptics';
 import { shareText } from '@/utils/share';
 import type { Person, PersonSplit } from '@/types';
+import { Text } from '@/components/design/Text';
 
 const PERSON_COLORS = AVATAR_PALETTE;
 

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
 import { PressBtn } from '@/components/PressBtn';
 import { ChevronDownCircleIcon, ChevronUpCircleIcon } from '@/components/FigmaIcons';
 import { CenteredModal } from './CenteredModal';
@@ -8,6 +7,7 @@ import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { Radius } from '@/constants/spacing';
 import { parseLocalDate, fmtDate } from '@/utils/date';
+import { Text } from './Text';
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

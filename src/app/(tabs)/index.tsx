@@ -12,7 +12,6 @@ import { Button, Card, CircleIconButton, ConfirmModal, DatePickerModal, DateRang
 import { JoinCodeModal } from '@/components/JoinCodeModal';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { C } from '@/constants/colors';
 import { Badge, InputMetrics, Radius } from '@/constants/spacing';
 import { Type } from '@/constants/typography';
@@ -22,6 +21,7 @@ import { fmt } from '@/utils/calculator';
 import { fmtDate, fmtDateRange, fmtMonthYear, parseLocalDate } from '@/utils/date';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import type { SplitRecord, Trip } from '@/types';
+import { Text } from '@/components/design/Text';
 
 let DateTimePicker: any = null;
 if (Platform.OS !== 'web') {

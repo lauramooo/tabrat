@@ -1,9 +1,10 @@
 import { View } from 'react-native';
-import { Text } from 'react-native-paper';
+
 import { Button } from './Button';
 import { CenteredModal } from './CenteredModal';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
+import { Text } from './Text';
 
 export function ConfirmModal({
   visible, onClose, onConfirm, title, body, icon,

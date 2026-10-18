@@ -2,18 +2,15 @@ import { PressBtn } from '@/components/PressBtn';
 import { CheckCircleIcon, PencilIcon, PlusIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import {
-  KeyboardAvoidingView, Platform, ScrollView,
-  StyleSheet, TextInput, View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, Card, Divider, FieldLabel, Input } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { lightHaptic, mediumHaptic } from '@/utils/haptics';
+import { Text, TextInput } from '@/components/design/Text';
 
 export default function HomeEditCategoriesScreen() {
   const router = useRouter();

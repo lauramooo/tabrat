@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, SortIcon } from '@/components/FigmaIcons';
 import { PressBtn } from '@/components/PressBtn';
 import { C } from '@/constants/colors';
@@ -12,6 +11,7 @@ import { selectionHaptic } from '@/utils/haptics';
 import { Button } from './Button';
 import { CenteredModal } from './CenteredModal';
 import { Divider } from './Divider';
+import { Text, TextInput } from './Text';
 
 /**
  * "Mark as paid" modal shown when tapping a WHO OWES WHO card — one canonical version

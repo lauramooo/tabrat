@@ -6,7 +6,6 @@ import {
   ScrollView, StyleSheet, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Card, ConfirmModal, IconBadge, SectionLabel } from '@/components/design';
 import { AlertIcon, TrashIcon } from '@/components/FigmaIcons';
@@ -15,6 +14,7 @@ import { Type } from '@/constants/typography';
 import { supabase } from '@/lib/supabase';
 import { useSplitStore } from '@/store/useSplitStore';
 import { mediumHaptic, selectionHaptic } from '@/utils/haptics';
+import { Text } from '@/components/design/Text';
 
 export const API_KEY_STORAGE_KEY = 'anthropic_api_key';
 export const PROFILE_USERNAME_KEY = 'profile_username';

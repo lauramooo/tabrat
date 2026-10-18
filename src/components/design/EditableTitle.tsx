@@ -46,7 +46,14 @@ export function EditableTitle({
 
   return (
     <View style={[styles.row, !compact && styles.rowTall]}>
-      <Text style={compact ? styles.textCompact : styles.text} numberOfLines={numberOfLines}>{value || fallback}</Text>
+      <Text
+        style={compact ? styles.textCompact : styles.text}
+        numberOfLines={numberOfLines}
+        adjustsFontSizeToFit={numberOfLines === 1}
+        minimumFontScale={0.75}
+      >
+        {value || fallback}
+      </Text>
       <PressBtn onPress={() => setEditing(true)} hitSlop={8} noShadow>
         <PencilIcon color={C.textSub} size={14} />
       </PressBtn>

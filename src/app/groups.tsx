@@ -3,21 +3,9 @@ import { PressBtn } from '@/components/PressBtn';
 import { PencilIcon, PlusIcon, TrashIcon, UserMultipleIcon } from '@/components/FigmaIcons';
 import { PersonChip } from '@/components/PersonChip';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Animated, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, Card, CircleIconButton, FieldLabel, IconBadge, Input } from '@/components/design';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
@@ -26,6 +14,7 @@ import { useSplitStore } from '@/store/useSplitStore';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import { toSentenceCase } from '@/utils/text';
 import type { Group } from '@/types';
+import { Text, TextInput } from '@/components/design/Text';
 
 const DEFAULT_GROUP_ICON = '👥';
 

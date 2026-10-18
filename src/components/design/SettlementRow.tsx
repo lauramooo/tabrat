@@ -1,6 +1,5 @@
 import { StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { Text } from 'react-native-paper';
 import { useRef } from 'react';
 import { ActionPill } from '@/components/ActionPill';
 import { Avatar } from '@/components/Avatar';
@@ -9,6 +8,7 @@ import { AVATAR_PALETTE, C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { fmt } from '@/utils/calculator';
 import { Card } from './Card';
+import { Text } from './Text';
 
 /**
  * An open "who owes who" row — tap to open the pay modal, swipe to mark fully paid.

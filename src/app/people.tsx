@@ -9,7 +9,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { BillHeader, FlowSteps } from '@/components/FlowSteps';
 import { ChevronDownCircleIcon, ChevronUpCircleIcon, PlusCircleIcon, TagIcon, UserIcon, UserMultipleIcon } from '@/components/FigmaIcons';
 import { PersonChip } from '@/components/PersonChip';
@@ -21,6 +20,7 @@ import { useSplitStore } from '@/store/useSplitStore';
 import { sortWithMeFirst } from '@/utils/sortPeople';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import type { Group } from '@/types';
+import { Text } from '@/components/design/Text';
 
 export default function PeopleScreen() {
   const router = useRouter();

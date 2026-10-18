@@ -5,11 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActionSheetIOS, Alert, Platform, Pressable } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Image,
-  ScrollView, StyleSheet, TextInput, View,
-} from 'react-native';
-import { Text } from 'react-native-paper';
+import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, CenteredModal, CircleIconButton, DateRangeField, Dropdown, DropdownRow, FieldLabel, Input } from '@/components/design';
 import { CameraIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, PencilIcon, PlusCircleIcon, SearchIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
@@ -22,6 +18,7 @@ import { fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator'
 import { fmtDate, parseLocalDate } from '@/utils/date';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import { applyTextShortcuts } from '@/utils/text';
+import { Text, TextInput } from '@/components/design/Text';
 
 // -- Category rename modal -----------------------------------------------------
 

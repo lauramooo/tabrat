@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
-import { Text } from 'react-native-paper';
 import { PressBtn } from '@/components/PressBtn';
 import { CalendarIcon, CloseCircleIcon } from '@/components/FigmaIcons';
 import { DateRangeCalendarModal } from './DateRangeCalendarModal';
@@ -8,6 +7,7 @@ import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { fmtDateRange } from '@/utils/date';
+import { Text } from './Text';
 
 // The single combined "when" field (trip dates, trip/home expense dates): one box reading
 // "Oct. 14, 2026" or "Oct. 14-17, 2026", opening the blue-to-pink range calendar on tap.

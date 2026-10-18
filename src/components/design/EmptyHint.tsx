@@ -1,7 +1,8 @@
 import { StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
+import { Text } from './Text';
 
 // Stand-ins for a trip/home dashboard section before there's anything in it — the section's
 // heading still shows (rendered by the caller, in that screen's own label style) with this hint

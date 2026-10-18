@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Platform, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
 import { ScissorIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
 import { Radius } from '@/constants/spacing';
 import { Type } from '@/constants/typography';
+import { Text } from '@/components/design/Text';
 
 const CARD_W = 230;
 // Web has no native animation driver — passing useNativeDriver there just prints a warning

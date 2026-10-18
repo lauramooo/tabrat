@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
 import { Button, CenteredModal, FieldLabel, Input } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
@@ -11,6 +10,7 @@ import { joinByCode, syncUserId } from '@/lib/sync';
 import { useSplitStore } from '@/store/useSplitStore';
 import { errorMessage } from '@/utils/errors';
 import { mediumHaptic } from '@/utils/haptics';
+import { Text } from '@/components/design/Text';
 
 // Redeems a trip/home/bill share code and jumps straight to what was joined. Shared by the Feed
 // header's "Join tab" button and the "+" FAB sheet so there's one join flow, not two.

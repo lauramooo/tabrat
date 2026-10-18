@@ -24,7 +24,6 @@ function fromInputDate(val: string): string {
 }
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { Badge, InputMetrics } from '@/constants/spacing';
@@ -34,6 +33,7 @@ import { fmtDate, parseLocalDate } from '@/utils/date';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import type { Trip } from '@/types';
 import { ActionPill } from '@/components/ActionPill';
+import { Text } from '@/components/design/Text';
 
 function TabPaidRow({ label, paid, amount, onToggle }: {
   label: string; paid: boolean; amount: number; onToggle: () => void;

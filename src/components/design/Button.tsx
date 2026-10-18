@@ -1,11 +1,11 @@
 import { cloneElement, isValidElement, useState } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
-import { Text } from 'react-native-paper';
 import { PressBtn } from '@/components/PressBtn';
 import { C } from '@/constants/colors';
 import { Radius, Spacing } from '@/constants/spacing';
 import { Type } from '@/constants/typography';
 import { toSentenceCase } from '@/utils/text';
+import { Text } from './Text';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'filter' | 'filterWide' | 'destructive' | 'inactive';
 export type ButtonSize = 'small' | 'big';
@@ -102,7 +102,6 @@ export function Button({
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.7}
-        maxFontSizeMultiplier={1.3}
       >
         {toSentenceCase(label)}
       </Text>

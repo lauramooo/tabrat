@@ -4,13 +4,9 @@ import { PressBtn } from '@/components/PressBtn';
 import { BillTypeIcon, CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, ExpenseIcon, LinkIcon, PlusIcon, ReopenIcon, SortIcon, TrashIcon } from '@/components/FigmaIcons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { createElement, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Dimensions, FlatList, Platform, Pressable, ScrollView, StyleSheet,
-  TextInput, View,
-} from 'react-native';
+import { Dimensions, FlatList, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { ActionPill } from '@/components/ActionPill';
 import { QuickAddBar } from '@/components/QuickAddBar';
 import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
@@ -30,6 +26,7 @@ import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import { applyTextShortcuts } from '@/utils/text';
 import type { SplitRecord } from '@/types';
+import { Text, TextInput } from '@/components/design/Text';
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 

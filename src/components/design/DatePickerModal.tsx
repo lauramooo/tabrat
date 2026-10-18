@@ -1,12 +1,12 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useEffect, useState } from 'react';
 import { Keyboard, Platform, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
 import { PressBtn } from '@/components/PressBtn';
 import { CenteredModal } from './CenteredModal';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { Radius } from '@/constants/spacing';
+import { Text } from './Text';
 
 export function DatePickerModal({
   visible, value, onChange, onClose, title,

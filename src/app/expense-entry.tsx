@@ -2,14 +2,10 @@ import { PressBtn } from '@/components/PressBtn';
 import { CheckCircleIcon, PencilIcon, PlusIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import {
-  KeyboardAvoidingView, Platform,
-  ScrollView, StyleSheet, TextInput, View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, CenteredModal, Input } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
@@ -19,6 +15,7 @@ import { useSplitStore } from '@/store/useSplitStore';
 import { fmt, sanitizeNumberInput } from '@/utils/calculator';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import type { ReceiptItem } from '@/types';
+import { Text, TextInput } from '@/components/design/Text';
 
 type ItemData = { id: string; name: string; price: number; quantity: number };
 

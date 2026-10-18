@@ -3,17 +3,9 @@ import { CloseCircleIcon, FriendsIcon, MinusCircleIcon, PencilIcon, PlusCircleIc
 import { useRouter } from 'expo-router';
 import { ScaleDecorator, NestableDraggableFlatList, NestableScrollContainer } from 'react-native-draggable-flatlist';
 import { useRef, useState } from 'react';
-import {
-  Animated,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Animated, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, CenteredModal, FieldLabel, Input } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
@@ -24,6 +16,7 @@ import { fmt, sanitizeNumberInput } from '@/utils/calculator';
 import { extrasTotal, itemDetailLabels } from '@/utils/items';
 import { lightHaptic, mediumHaptic } from '@/utils/haptics';
 import type { ExtraCharge, ReceiptItem } from '@/types';
+import { Text, TextInput } from '@/components/design/Text';
 
 type ItemData = ReceiptItem;
 

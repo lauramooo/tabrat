@@ -71,6 +71,7 @@ The root `Stack` (`src/app/_layout.tsx`) defaults every screen to a fully transp
 
 ## Key conventions
 
+- Import `Text` and `TextInput` from `@/components/design/Text`, never from `react-native-paper` / `react-native` directly — those wrappers cap how far text grows with the system text-size setting (`MAX_FONT_SCALE`), which layouts sized for default text depend on
 - All colors come from `src/constants/colors.ts` (`C.bg`, `C.primary`, etc.) — never hardcode hex values
 - Path alias `@/` maps to `src/` (configured in `tsconfig.json`)
 - `SafeAreaView` from `react-native-safe-area-context` with `edges={['bottom']}` on every screen — the Stack header handles top safe area

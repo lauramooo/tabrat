@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Keyboard, Platform, StyleProp, StyleSheet, TextInput, View, ViewStyle } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Animated, Dimensions, Easing, Keyboard, Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { PressBtn } from '@/components/PressBtn';
 import { CheckCircleIcon, PlusIcon } from '@/components/FigmaIcons';
 import { Button, Card, Dropdown, DropdownRow } from '@/components/design';
@@ -10,6 +9,7 @@ import { Type } from '@/constants/typography';
 import { getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator';
 import { mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import { applyTextShortcuts } from '@/utils/text';
+import { Text, TextInput } from '@/components/design/Text';
 
 // The one-line "name / amount / payer" row that logs an expense without leaving the page, plus the
 // page's big bottom button — shared by the Dashboard and Expenses tabs of trips and homes. The

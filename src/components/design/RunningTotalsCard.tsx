@@ -1,11 +1,12 @@
 import { StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+
 import { Avatar } from '@/components/Avatar';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { fmt } from '@/utils/calculator';
 import { Card } from './Card';
 import { Divider } from './Divider';
+import { Text } from './Text';
 
 /**
  * The avatar + name + amount list shown under "RUNNING TOTALS" — one canonical version so a

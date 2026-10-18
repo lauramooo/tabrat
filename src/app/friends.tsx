@@ -4,13 +4,9 @@ import { ActionPill } from '@/components/ActionPill';
 import { Avatar } from '@/components/Avatar';
 import { PencilIcon, PlusIcon, TrashIcon, UserIcon, UserMultipleIcon } from '@/components/FigmaIcons';
 import { useMemo, useRef, useState } from 'react';
-import {
-  ScrollView, SectionList,
-  StyleSheet, TextInput, View,
-} from 'react-native';
+import { ScrollView, SectionList, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, Card, CenteredModal, FieldLabel, IconBadge, Input, SectionLabel } from '@/components/design';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
 import { InputMetrics } from '@/constants/spacing';
@@ -19,6 +15,7 @@ import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import type { Person } from '@/types';
+import { Text, TextInput } from '@/components/design/Text';
 
 function initials(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Keyboard, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, Divider, FieldLabel, Input } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
@@ -11,6 +10,7 @@ import { type OAuthProvider, signInWithOAuth } from '@/lib/oauth';
 import { supabase } from '@/lib/supabase';
 import { errorMessage } from '@/utils/errors';
 import { mediumHaptic, selectionHaptic } from '@/utils/haptics';
+import { Text } from '@/components/design/Text';
 
 const OAUTH_ICONS: Record<OAuthProvider, React.ReactElement> = {
   google: <GoogleLogoIcon size={32} />,

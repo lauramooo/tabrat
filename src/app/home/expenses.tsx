@@ -3,13 +3,9 @@ import { BillTypeIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIc
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet,
-  TextInput, View,
-} from 'react-native';
+import { Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { ActionPill } from '@/components/ActionPill';
 import { Button, Card, CenteredModal, CircleIconButton, ConfirmModal, DateRangeField, Dropdown, DropdownRow, FieldLabel, IconBadge, Input, SectionLabel } from '@/components/design';
 import { GroupHeader, HeaderMonthPicker } from '@/components/GroupHeader';
@@ -29,6 +25,7 @@ import { fmtDate } from '@/utils/date';
 import { mediumHaptic, selectionHaptic, lightHaptic } from '@/utils/haptics';
 import { applyTextShortcuts } from '@/utils/text';
 import type { SplitRecord } from '@/types';
+import { Text, TextInput } from '@/components/design/Text';
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 

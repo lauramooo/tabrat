@@ -1,10 +1,11 @@
 import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressBtn } from '@/components/PressBtn';
 import { CheckCircleIcon, MoreIcon, PencilIcon, ReopenIcon, SendIcon, TrashIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
+import { Text } from '@/components/design/Text';
 
 // The ⋮ header button of a trip or home — shared by its Dashboard and Expenses tabs so the menu
 // is identical on both.

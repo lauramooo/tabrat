@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Image, ImageStyle, StyleProp, View, ViewStyle } from 'react-native';
-import { Text } from 'react-native-paper';
 import { AVATAR_PALETTE } from '@/constants/colors';
 import { useMyName, useMyPhoto } from '@/utils/sortPeople';
+import { Text } from '@/components/design/Text';
 
 function getInitials(name: string, twoLetter: boolean): string {
   const trimmed = name.trim();

@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { CircleIconButton, IconBadge } from '@/components/design';
 import { CameraIcon, PencilIcon, ReceiptIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
@@ -12,6 +11,7 @@ import { useSplitStore } from '@/store/useSplitStore';
 import { fmt } from '@/utils/calculator';
 import { fmtDate } from '@/utils/date';
 import { mediumHaptic, selectionHaptic, lightHaptic } from '@/utils/haptics';
+import { Text } from '@/components/design/Text';
 
 export default function ExpenseScreen() {
   const { tripId, showImport: showImportParam } = useLocalSearchParams<{ tripId: string; showImport?: string }>();

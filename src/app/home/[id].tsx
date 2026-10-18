@@ -4,14 +4,10 @@ import { CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIc
 import { ShareCodeModal } from '@/components/ShareCodeModal';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet,
-  TextInput, View,
-} from 'react-native';
+import { Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Svg, { G, Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Avatar } from '@/components/Avatar';
 import { GroupHeader, HeaderMonthPicker } from '@/components/GroupHeader';
 import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
@@ -29,6 +25,7 @@ import { getCategoryData } from '@/utils/categoryColors';
 import { fmtDate, parseLocalDate } from '@/utils/date';
 import { mediumHaptic, selectionHaptic, lightHaptic } from '@/utils/haptics';
 import { layoutPieSegments, roundedSegmentPath } from '@/utils/pieLayout';
+import { Text, TextInput } from '@/components/design/Text';
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 

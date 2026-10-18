@@ -2,8 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressBtn } from '@/components/PressBtn';
 import { createElement, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
-import { Image, Modal, Platform, Pressable, Share, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Image, Modal, Platform, Pressable, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, CircleIconButton, ConfirmModal, EditableTitle } from '@/components/design';
 import { ShareCodeModal } from '@/components/ShareCodeModal';
@@ -17,6 +16,7 @@ import { useSplitStore } from '@/store/useSplitStore';
 import { fmtDate, parseLocalDate } from '@/utils/date';
 import { resolveReceiptUri } from '@/utils/receiptImage';
 import { selectionHaptic, lightHaptic } from '@/utils/haptics';
+import { Text, TextInput } from '@/components/design/Text';
 
 let DateTimePicker: any = null;
 if (Platform.OS !== 'web') {

@@ -1,11 +1,11 @@
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { HandCardLeft, HandCardRight } from '@/components/FigmaIcons';
 import { mediumHaptic } from '@/utils/haptics';
+import { Text } from '@/components/design/Text';
 
 // Shown once, before AuthGate, on a device that's never gotten past it — same hero/title layout
 // as AuthGate (same hand illustration, same title style) but with no form, just what the app is

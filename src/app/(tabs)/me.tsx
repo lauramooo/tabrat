@@ -9,7 +9,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, Card, CenteredModal, CircleIconButton, Divider, EditableTitle, IconBadge, SectionLabel } from '@/components/design';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
@@ -18,6 +17,7 @@ import { syncProfileIdentity } from '@/lib/sync';
 import { useSplitStore } from '@/store/useSplitStore';
 import { CURRENCIES, PROFILE_HANDLE_KEY, PROFILE_PHOTO_KEY, PROFILE_USERNAME_KEY, getStorageItem, setStorageItem } from '@/app/settings';
 import { lightHaptic, selectionHaptic } from '@/utils/haptics';
+import { Text } from '@/components/design/Text';
 
 const SUPPORT_EMAIL = 'miss.lauramolano@gmail.com';
 

@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { Text } from 'react-native-paper';
 import { ActionPill } from '@/components/ActionPill';
 import { Avatar } from '@/components/Avatar';
 import { CheckCircleIcon, ReopenIcon } from '@/components/FigmaIcons';
@@ -9,6 +8,7 @@ import { AVATAR_PALETTE, C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { fmt } from '@/utils/calculator';
 import { Card } from './Card';
+import { Text } from './Text';
 
 /**
  * A settled "who owes who" row (shown under PAID) — tap or swipe to reopen it.

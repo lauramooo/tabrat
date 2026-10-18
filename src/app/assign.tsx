@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ProgressBar, Text } from 'react-native-paper';
+import { ProgressBar } from 'react-native-paper';
 import { Button, Card } from '@/components/design';
 import { BillHeader, FlowSteps } from '@/components/FlowSteps';
 import { ChevronDownCircleIcon, ChevronUpCircleIcon, ScissorIcon } from '@/components/FigmaIcons';
@@ -15,6 +15,7 @@ import { itemDetailLabels } from '@/utils/items';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { fmt } from '@/utils/calculator';
 import { errorHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
+import { Text } from '@/components/design/Text';
 
 const ITEM_CATEGORIES = ['All', 'Drinks', 'Apps', 'Mains', 'Dessert', 'Sides', 'Other'];
 

@@ -1,9 +1,10 @@
 import { forwardRef, useState } from 'react';
-import { StyleProp, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { StyleProp, TextInputProps, View, ViewStyle } from 'react-native';
 import { SearchIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
+import { TextInput } from './Text';
 
 const BORDER_WIDTH = 1.5;
 

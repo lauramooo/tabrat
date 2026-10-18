@@ -2,7 +2,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
 import { Button, CenteredModal, CircleIconButton, Divider, FieldLabel, Input } from '@/components/design';
 import { CameraIcon, CheckCircleIcon, MoneyIcon, PhotoIcon, TrashIcon } from '@/components/FigmaIcons';
 import { PressBtn } from '@/components/PressBtn';
@@ -14,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { useSplitStore } from '@/store/useSplitStore';
 import { errorMessage } from '@/utils/errors';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
+import { Text } from '@/components/design/Text';
 
 const HANDLE_PATTERN = /^[a-zA-Z0-9_]{3,20}$/;
 

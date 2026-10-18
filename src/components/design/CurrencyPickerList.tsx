@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { CheckCircleIcon, SearchIcon } from '@/components/FigmaIcons';
 import { CURRENCIES } from '@/constants/currencies';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { DropdownRow } from './DropdownRow';
+import { Text, TextInput } from './Text';
 
 /**
  * The searchable currency list shown inside a Dropdown (see trip/new.tsx and trip/[id].tsx) —

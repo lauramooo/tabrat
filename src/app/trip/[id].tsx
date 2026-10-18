@@ -5,14 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  ActionSheetIOS, Alert, Dimensions, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet,
-  TextInput, View,
-} from 'react-native';
+import { ActionSheetIOS, Alert, Dimensions, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Svg, { G, Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ProgressBar, Text } from 'react-native-paper';
+import { ProgressBar } from 'react-native-paper';
 import { Avatar } from '@/components/Avatar';
 import { GroupHeader } from '@/components/GroupHeader';
 import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
@@ -32,6 +29,7 @@ import { layoutPieSegments, roundedSegmentPath } from '@/utils/pieLayout';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import type { SplitRecord, Person } from '@/types';
+import { Text, TextInput } from '@/components/design/Text';
 
 function getExpenseISODate(r: SplitRecord): string {
   if (r.receiptDate) {
