@@ -43,12 +43,11 @@ Rules:
 - The receipt may be faded, angled, or low-contrast (thermal paper) — take extra care reading digits in that case.
 - Be precise — misread prices cause incorrect splits. Double-check every number, and confirm subtotal + tax + tip + extraCharges (adding charges, subtracting discounts) equals total before responding.`;
 
-const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+const HAIKU_MODEL = 'claude-haiku-5-5';
 // Used only as a one-time retry when Haiku's read doesn't parse or its math doesn't reconcile —
 // slower and more expensive, so it's the exception path, not the default.
 const SONNET_MODEL = 'claude-sonnet-5';
-const MAX_TOKENS = 4096; // was 1024 — too low for a receipt with 20-30+ items, which truncated
-// mid-JSON and hard-failed parsing on exactly the receipts most in need of an accurate split.
+const MAX_TOKENS = 16000; // shared with thinking — see the comment on output_config below
 
 // A few cents of tolerance absorbs rounding on the receipt itself; the percentage tolerance
 // scales that for larger totals without being so loose it misses a genuinely misread price.
@@ -61,10 +60,9 @@ function withinTolerance(a: number, b: number): boolean {
 // a stronger model instead of silently handing the user a bad split.
 function isReceiptSane(parsed: ParsedReceipt): boolean {
   if (!parsed.items?.length) return false;
-  // A real menu item is essentially never $0 — this is the tell-tale sign of an unmerged
-  // modifier/sub-line that leaked through as its own item instead of being folded into its
-  // parent's "modifiers" array, so treat it as worth a stronger-model retry.
-  if (parsed.items.some((i) => i.price <= 0)) return false;
+  // $0 lines are real on restaurant receipts (free water, refills, chips), so only a negative
+  // price is a misread. Rejecting $0 sent nearly every scan to the slow Sonnet retry.
+  if (parsed.items.some((i) => i.price < 0)) return false;
   const itemsSum = parsed.items.reduce((s, i) => s + i.price, 0);
   if (!withinTolerance(itemsSum, parsed.subtotal)) return false;
   const extraNet = (parsed.extraCharges ?? []).reduce((s, c) => s + (c.isDiscount ? -c.amount : c.amount), 0);
@@ -72,14 +70,23 @@ function isReceiptSane(parsed: ParsedReceipt): boolean {
   return true;
 }
 
+export const UNREADABLE_RECEIPT = "Couldn't read this receipt. Crop closer to just the receipt, or retake the photo.";
+
 // Shared by both the bring-your-own-key (direct to Anthropic) and shared-key (via the
 // scan-receipt Edge Function proxy) paths — both return the same raw Anthropic response shape.
 function normalizeReceipt(data: { content: { type: string; text: string }[] }): ParsedReceipt {
   const text = data.content.find((c) => c.type === 'text')?.text ?? '';
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Could not parse receipt — no JSON in response');
+  // No JSON at all means the model answered in prose — almost always "too small/blurry to read",
+  // typically a whole-table photo where the receipt is a thin strip after Claude's downscale.
+  if (!jsonMatch) throw new Error(UNREADABLE_RECEIPT);
 
-  const parsed = JSON.parse(jsonMatch[0]) as ParsedReceipt;
+  let parsed: ParsedReceipt;
+  try {
+    parsed = JSON.parse(jsonMatch[0]) as ParsedReceipt;
+  } catch {
+    throw new Error(UNREADABLE_RECEIPT);
+  }
 
   // Normalize whatever date format the model returned to the app's standard "Jan 4, 2027" format
   if (parsed.receiptDate) {
@@ -113,6 +120,11 @@ async function callAnthropic(base64Image: string, apiKey: string, model: string)
     body: JSON.stringify({
       model,
       max_tokens: MAX_TOKENS,
+      // Thinking stays on at medium effort: with it off (or at low), long multi-guest receipts
+      // came back with standalone upcharge lines dropped, so items stopped summing to the
+      // subtotal. MAX_TOKENS has to leave room for it — at 4096 the thinking could use the whole
+      // budget before any JSON was written ("no JSON in response").
+      output_config: { effort: 'medium' },
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -171,14 +183,21 @@ export async function parseReceiptViaProxy(
   supabaseUrl: string,
   accessToken: string,
 ): Promise<ParsedReceipt> {
+  // Long multi-guest receipts legitimately take 20-30s (thinking is on for accuracy), so this is
+  // only a backstop against a hung request — generous enough never to cut off a real read.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90_000);
   const response = await fetch(`${supabaseUrl}/functions/v1/scan-receipt`, {
+    signal: controller.signal,
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       'Authorization': `Bearer ${accessToken}`,
     },
     body: JSON.stringify({ image: base64Image }),
-  });
+  }).catch((e) => {
+    throw controller.signal.aborted ? new Error(UNREADABLE_RECEIPT) : e;
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));

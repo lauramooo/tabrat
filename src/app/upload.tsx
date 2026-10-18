@@ -18,12 +18,16 @@ import { FlowSteps } from '@/components/FlowSteps';
 import { useSplitStore } from '@/store/useSplitStore';
 import { getStorageItem, setStorageItem } from './settings';
 import { supabase } from '@/lib/supabase';
-import { parseReceiptViaProxy } from '@/utils/receiptParser';
+import { parseReceiptViaProxy, UNREADABLE_RECEIPT } from '@/utils/receiptParser';
 import { errorMessage } from '@/utils/errors';
 import { lightHaptic, mediumHaptic, errorHaptic } from '@/utils/haptics';
 // Set once the user OKs sending receipt photos to Anthropic — App Store guideline 5.1.2(i)
 // requires disclosing and getting consent before sharing personal data with a third-party AI.
 const AI_SCAN_CONSENT_KEY = 'ai_scan_consent';
+
+// Claude downscales any image past ~1568px on its long edge before reading it, so sending more
+// than that only makes the upload slower (a full-res iPhone photo is 5-10MB) with no accuracy gain.
+const MAX_SCAN_EDGE = 1568;
 
 const MIN_DIM = 60;
 // L-bracket handle dimensions — positioned INSIDE the crop box, never extending outside
@@ -234,8 +238,13 @@ export default function UploadScreen() {
     setLoading(true);
 
     try {
-      let scanUri = uri;
-      let scanB64 = base64;
+      // The manipulator's own view of the file, not <Image onLoad>'s — see the crop comment below.
+      const probe = await ImageManipulator.manipulate(uri).renderAsync();
+      const iw = probe.width;
+      const ih = probe.height;
+      let context = ImageManipulator.manipulate(uri);
+      let outW = iw;
+      let outH = ih;
 
       if (cropReady && userAdjustedCrop) {
         const { offsetX: ox, offsetY: oy, displayW: dw, displayH: dh } = boundsRef.current;
@@ -246,9 +255,6 @@ export default function UploadScreen() {
           // The actual crop must be computed against the manipulator's own view of the file, or
           // the resulting rectangle comes out scaled down and anchored toward the top-left corner
           // of the real image, silently losing whatever's further right/down.
-          const probe = await ImageManipulator.manipulate(uri).renderAsync();
-          const iw = probe.width;
-          const ih = probe.height;
           const scaleX = iw / dw;
           const scaleY = ih / dh;
           const originX = Math.max(0, Math.round((cropBox.x - ox) * scaleX));
@@ -256,21 +262,26 @@ export default function UploadScreen() {
           const cropW = Math.max(1, Math.min(iw - originX, Math.round(cropBox.w * scaleX)));
           const cropH = Math.max(1, Math.min(ih - originY, Math.round(cropBox.h * scaleY)));
 
-          const ref = await ImageManipulator.manipulate(uri)
-            .crop({ originX, originY, width: cropW, height: cropH })
-            .renderAsync();
-          const result = await ref.saveAsync({ compress: 0.85, format: SaveFormat.JPEG, base64: true });
-          scanUri = result.uri;
-          scanB64 = result.base64 ?? base64;
+          context = context.crop({ originX, originY, width: cropW, height: cropH });
+          outW = cropW;
+          outH = cropH;
         }
       }
+
+      if (Math.max(outW, outH) > MAX_SCAN_EDGE) {
+        context = context.resize(outW >= outH ? { width: MAX_SCAN_EDGE } : { height: MAX_SCAN_EDGE });
+      }
+      const ref = await context.renderAsync();
+      const result = await ref.saveAsync({ compress: 0.85, format: SaveFormat.JPEG, base64: true });
+      const scanUri = result.uri;
+      const scanB64 = result.base64 ?? base64;
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { errorHaptic(); setLoading(false); return; }
       const data = await parseReceiptViaProxy(scanB64, process.env.EXPO_PUBLIC_SUPABASE_URL!, session.access_token);
       if (!data.items?.length) {
         errorHaptic();
-        setError('Could not find any items on this receipt. Try a clearer photo, or enter items manually.');
+        setError(UNREADABLE_RECEIPT);
         setLoading(false);
         return;
       }
@@ -350,7 +361,11 @@ export default function UploadScreen() {
           </View>
         )}
 
-        {error ? <Text variant="bodySmall" style={styles.errorText}>{error}</Text> : null}
+        {error ? (
+          <Text variant="bodySmall" style={styles.errorText}>{error}</Text>
+        ) : uri ? (
+          <Text variant="bodySmall" style={styles.hintText}>Crop to just the receipt for the best scan</Text>
+        ) : null}
 
         {/* -- Unified footer: Enter Manually + Import (?Scan) -- */}
         <View style={styles.btnRow}>
@@ -423,5 +438,6 @@ const styles = StyleSheet.create({
 
   btnRow: { flexDirection: 'row', gap: 10 },
   errorText: { color: C.error, textAlign: 'center', paddingHorizontal: 8 },
+  hintText: { color: C.textSub, textAlign: 'center', paddingHorizontal: 8 },
 
 });

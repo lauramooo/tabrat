@@ -389,12 +389,16 @@ function ChargeModal({ visible, initialIsDiscount = false, subtotal, onClose }: 
 export default function ReviewScreen() {
   const router = useRouter();
   const {
-    items, tax, tip, extraCharges,
+    items, tax, tip, extraCharges, subtotal: printedSubtotal,
     setTax, setTip, addItemWithDetails, setItemOrder,
   } = useSplitStore();
 
   // Tax / Tip
   const subtotal = items.reduce((s, i) => s + i.price, 0);
+  // `printedSubtotal` is the subtotal read off the scanned receipt (0 for manual entry). If the
+  // items don't add up to it, an item was missed or misread — say so rather than let a quietly
+  // wrong split through. Clears itself once the user fixes the items.
+  const itemsMismatch = printedSubtotal > 0 && Math.abs(subtotal - printedSubtotal) >= 0.01;
   const [taxPct, setTaxPct] = useState(() => subtotal > 0 && tax > 0 ? ((tax / subtotal) * 100).toFixed(2) : '');
   const [taxDollar, setTaxDollar] = useState(tax > 0 ? tax.toFixed(2) : '');
   const [tipPct, setTipPct] = useState(() => subtotal > 0 && tip > 0 ? ((tip / subtotal) * 100).toFixed(0) : '');
@@ -532,6 +536,11 @@ export default function ReviewScreen() {
           {/* Totals summary */}
           <View style={s.totalsDivider} />
           <View style={s.totalsSection}>
+            {itemsMismatch && (
+              <Text style={s.mismatchText}>
+                Items add up to {fmt(subtotal)}, but the receipt says {fmt(printedSubtotal)}. Check for a missing or misread item.
+              </Text>
+            )}
             <View style={s.sumRow}><Text style={s.sumLabel}>Subtotal</Text><Text style={s.sumValue}>{fmt(subtotal)}</Text></View>
             <View style={s.sumRow}><Text style={s.sumLabel}>Tax</Text><Text style={s.sumValue}>{fmt(parsedTax)}</Text></View>
             <View style={s.sumRow}><Text style={s.sumLabel}>Tip</Text><Text style={s.sumValue}>{fmt(parsedTip)}</Text></View>
@@ -668,6 +677,7 @@ const s = StyleSheet.create({
   },
 
   errorText: { color: C.error, textAlign: 'center', paddingHorizontal: 16, paddingBottom: 4, fontSize: 13 },
+  mismatchText: { color: C.error, fontSize: 13, paddingBottom: 8 },
 
   // Modals
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center', padding: 24 },

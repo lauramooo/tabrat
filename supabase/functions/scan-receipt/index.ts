@@ -48,9 +48,9 @@ Rules:
 - The receipt may be faded, angled, or low-contrast (thermal paper) — take extra care reading digits in that case.
 - Be precise — misread prices cause incorrect splits. Double-check every number, and confirm subtotal + tax + tip + extraCharges (adding charges, subtracting discounts) equals total before responding.`;
 
-const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+const HAIKU_MODEL = 'claude-haiku-5-5';
 const SONNET_MODEL = 'claude-sonnet-5';
-const MAX_TOKENS = 4096; // was 1024 — truncated mid-JSON on longer receipts (20-30+ items)
+const MAX_TOKENS = 16000; // shared with thinking — see the comment on output_config below
 
 type ParsedReceiptLike = {
   items?: { price: number }[];
@@ -67,9 +67,9 @@ function withinTolerance(a: number, b: number): boolean {
 
 function isReceiptSane(parsed: ParsedReceiptLike): boolean {
   if (!parsed.items?.length) return false;
-  // A real menu item is essentially never $0 — the tell-tale sign of an unmerged
-  // modifier/sub-line that leaked through as its own item — so treat it as worth a retry.
-  if (parsed.items.some((i) => i.price <= 0)) return false;
+  // $0 lines are real on restaurant receipts (free water, refills, chips), so only a negative
+  // price is a misread. Rejecting $0 sent nearly every scan to the slow Sonnet retry.
+  if (parsed.items.some((i) => i.price < 0)) return false;
   const itemsSum = parsed.items.reduce((s, i) => s + i.price, 0);
   if (!withinTolerance(itemsSum, parsed.subtotal ?? 0)) return false;
   const extraNet = (parsed.extraCharges ?? []).reduce((s, c) => s + (c.isDiscount ? -c.amount : c.amount), 0);
@@ -115,6 +115,11 @@ async function callAnthropic(anthropicKey: string, base64Image: string, model: s
     body: JSON.stringify({
       model,
       max_tokens: MAX_TOKENS,
+      // Thinking stays on at medium effort: with it off (or at low), long multi-guest receipts
+      // came back with standalone upcharge lines dropped, so items stopped summing to the
+      // subtotal. MAX_TOKENS has to leave room for it — at 4096 the thinking could use the whole
+      // budget before any JSON was written ("no JSON in response").
+      output_config: { effort: 'medium' },
       system: SYSTEM_PROMPT,
       messages: [
         {
