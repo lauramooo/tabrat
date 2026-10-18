@@ -12,15 +12,20 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { ActionPill } from '@/components/ActionPill';
+import { QuickAddBar } from '@/components/QuickAddBar';
+import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
+import { ShareCodeModal } from '@/components/ShareCodeModal';
+import { requestGroupEdit } from '@/utils/pendingGroupEdit';
 import { Avatar } from '@/components/Avatar';
-import { Button, Card, CenteredModal, CircleIconButton, Dropdown, DropdownRow, EditableTitle, IconBadge } from '@/components/design';
+import { GroupHeader } from '@/components/GroupHeader';
+import { Button, Card, CenteredModal, CircleIconButton, ConfirmModal, Dropdown, DropdownRow, EditableTitle, IconBadge } from '@/components/design';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator';
 import { getCategoryColorMap, getCategoryData } from '@/utils/categoryColors';
-import { fmtDate, fmtMonthYear } from '@/utils/date';
+import { fmtDate, fmtMonthYear, parseLocalDate } from '@/utils/date';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import { applyTextShortcuts } from '@/utils/text';
@@ -39,7 +44,7 @@ function toISO(d: string): string {
 }
 function parseDisplay(d: string): Date {
   const iso = toISO(d);
-  const dt = iso ? new Date(iso + 'T00:00:00') : new Date(d);
+  const dt = iso ? new Date(iso + 'T00:00:00') : parseLocalDate(d);
   return isNaN(dt.getTime()) ? new Date() : dt;
 }
 function getExpenseISODate(r: SplitRecord): string {
@@ -229,7 +234,7 @@ function ExpenseQuickModal({ item, onClose }: { item: SplitRecord; onClose: () =
 export default function TripExpensesScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const router = useRouter();
-  const { trips, history, startTripEntry, deleteHistory, saveTripExpenseDirectly } = useSplitStore();
+  const { trips, history, startTripEntry, deleteHistory, saveTripExpenseDirectly, closeTrip, deleteTrip } = useSplitStore();
 
   const [scopePerson, setScopePerson] = useState(''); // '' = everyone, else = person name
   const [scopeDropOpen, setScopeDropOpen] = useState(false);
@@ -248,14 +253,9 @@ export default function TripExpensesScreen() {
     if (today < start || today > end) return null;
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   });
-  const [quickName, setQuickName] = useState('');
-  const [quickAmountText, setQuickAmountText] = useState('');
-  const [quickPayer, setQuickPayer] = useState<string | null>(null);
-  const [quickPayerDropOpen, setQuickPayerDropOpen] = useState(false);
-  const [quickPayerDropPos, setQuickPayerDropPos] = useState<{ bottom: number; right: number } | null>(null);
-  const quickPayerBtnRef = useRef<View>(null);
-  const [quickNameFocused, setQuickNameFocused] = useState(false);
-  const [quickAmountFocused, setQuickAmountFocused] = useState(false);
+  const [actionsMenu, setActionsMenu] = useState(false);
+  const [shareModal, setShareModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const initialSelectedDayRef = useRef(selectedDayISO);
   const dayScrollRef = useRef<FlatList<any>>(null);
   const [dayStripW, setDayStripW] = useState(0);
@@ -433,64 +433,50 @@ export default function TripExpensesScreen() {
   const tripCurrencies = trip.currencies ?? (trip.currency ? [trip.currency] : ['USD']);
   const quickExpenseCurrency = tripCurrencies[0];
 
-  const quickAmount = parseFloat(quickAmountText) || 0;
-  const canSaveQuick = quickName.trim().length > 0 && quickAmount > 0 && !!quickPayer;
-  const quickAddStarted = quickName.trim().length > 0 || quickAmountText.length > 0 || !!quickPayer;
-
-  const openQuickPayerDropdown = () => {
-    selectionHaptic();
-    if (quickPayerBtnRef.current) {
-      quickPayerBtnRef.current.measureInWindow((_x: number, y: number) => {
-        const sh = Dimensions.get('window').height;
-        setQuickPayerDropPos({ bottom: sh - y + 4, right: 16 });
-        setQuickPayerDropOpen(true);
-      });
-    } else {
-      setQuickPayerDropOpen((o) => !o);
-    }
-  };
-
-  const handleQuickSave = () => {
-    if (!canSaveQuick || !quickPayer) return;
-    mediumHaptic();
+  const handleQuickSave = ({ name, amount, payer }: { name: string; amount: number; payer: string }) => {
     saveTripExpenseDirectly({
-      name: quickName.trim(),
+      name,
       receiptDate: fmtDate(new Date()),
       category: null,
-      rawItems: [{ name: quickName.trim(), price: quickAmount, quantity: 1 }],
+      rawItems: [{ name, price: amount, quantity: 1 }],
       participants: tripPeople,
-      paidByName: quickPayer,
+      paidByName: payer,
       tripId: tripId!,
       currency: quickExpenseCurrency,
     });
-    setQuickName('');
-    setQuickAmountText('');
-    setQuickPayer(null);
   };
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <Stack.Screen options={{
-        title: `${trip.name} expenses`,
-        headerTitleAlign: 'left',
+        headerTitleAlign: 'center',
         headerTransparent: false,
         headerStyle: { backgroundColor: C.bg },
+        title: '',
+        headerTitle: () => null,
+        // This page is the trip's Expenses tab, pushed over its Dashboard tab — back returns there.
         headerLeft: () => (
           <CircleIconButton variant="back" size={28} color={C.primary} onPress={() => router.back()} style={{ paddingHorizontal: 12 }} />
         ),
+        headerRight: () => <GroupActionsButton onPress={() => setActionsMenu(true)} />,
       }} />
+      <GroupHeader name={trip.name} date={trip.startDate} endDate={trip.endDate} people={tripPeople}
+        active="expenses" onSelectTab={() => { selectionHaptic(); router.back(); }} />
 
-      {tabs.length > 0 && (
+      {/* Month the day strip is on — shown even before any expenses, so you always know where you are. */}
+      {(tabs.length > 0 || !!displayedMonthKey) && (
         <View style={s.expHeaderRow}>
           <Text style={s.monthNavLabel}>{displayedMonthKey ? fmtMonthYear(`${displayedMonthKey}-01`) : ''}</Text>
-          <PressBtn ref={scopeBtnRef} style={s.scopeDrop} onPress={openScopeDropdown} activeOpacity={0.8}>
-            <Text style={s.scopeDropText}>
-              {scopePerson ? (scopePerson === myName ? `${scopePerson} (me)` : scopePerson) : 'Everyone'}
-            </Text>
-            {scopeDropOpen
-              ? <ChevronUpCircleIcon color={C.text} size={15} />
-              : <ChevronDownCircleIcon color={C.text} size={15} />}
-          </PressBtn>
+          {tabs.length > 0 && (
+            <PressBtn ref={scopeBtnRef} style={s.scopeDrop} onPress={openScopeDropdown} activeOpacity={0.8}>
+              <Text style={s.scopeDropText}>
+                {scopePerson ? (scopePerson === myName ? `${scopePerson} (me)` : scopePerson) : 'Everyone'}
+              </Text>
+              {scopeDropOpen
+                ? <ChevronUpCircleIcon color={C.text} size={15} />
+                : <ChevronDownCircleIcon color={C.text} size={15} />}
+            </PressBtn>
+          )}
         </View>
       )}
       <Dropdown visible={scopeDropOpen} position={scopeDropPos} onClose={() => setScopeDropOpen(false)} style={{ minWidth: 190 }}>
@@ -595,70 +581,40 @@ export default function TripExpensesScreen() {
         <View style={{ height: 8 }} />
       </ScrollView>
 
-      <>
-        <View style={s.quickAddRow}>
-          <Card padding={0} row={false} radius={10} style={[s.quickAddNameCard, quickNameFocused && s.quickAddFieldActive]}>
-            <TextInput
-              style={[s.quickAddNameInput, { outlineWidth: 0 } as any]}
-              value={quickName}
-              onChangeText={(v) => setQuickName(applyTextShortcuts(v))}
-              onFocus={() => setQuickNameFocused(true)}
-              onBlur={() => setQuickNameFocused(false)}
-              placeholder="Quick add"
-              placeholderTextColor={C.textDim}
-              returnKeyType="next"
-            />
-          </Card>
-          <Card padding={0} row={false} radius={10} style={[s.quickAddAmountCard, quickAmountFocused && s.quickAddFieldActive]}>
-            <View style={s.quickAddAmountInner}>
-              <Text style={s.moneyPrefix}>{getCurrencySymbol(quickExpenseCurrency)}</Text>
-              <TextInput
-                style={[s.quickAddAmountInput, { outlineWidth: 0 } as any]}
-                value={quickAmountText}
-                onChangeText={(v) => setQuickAmountText(sanitizeNumberInput(v))}
-                onFocus={() => setQuickAmountFocused(true)}
-                onBlur={() => setQuickAmountFocused(false)}
-                keyboardType="decimal-pad"
-                placeholder="0"
-                placeholderTextColor={C.textDim}
-                returnKeyType="done"
-                onSubmitEditing={handleQuickSave}
-              />
-            </View>
-          </Card>
-          <PressBtn ref={quickPayerBtnRef} style={[s.quickAddPayerBtn, quickPayerDropOpen && s.quickAddFieldActive]} onPress={openQuickPayerDropdown} noShadow>
-            <Text style={[s.quickAddPayerText, !quickPayer && { color: C.textDim }]} numberOfLines={1}>
-              {quickPayer ? (quickPayer === myName ? 'Me' : quickPayer) : 'Payer'}
-            </Text>
-          </PressBtn>
-          <PressBtn onPress={handleQuickSave} disabled={!canSaveQuick} hitSlop={8} noShadow>
-            <CheckCircleIcon size={19} color={canSaveQuick ? C.text : C.textDim} filled={canSaveQuick} fillColor={C.yellow} />
-          </PressBtn>
-          <Dropdown visible={quickPayerDropOpen} position={quickPayerDropPos} onClose={() => setQuickPayerDropOpen(false)} style={{ minWidth: 150 }}>
-            {tripPeople.map((name, i) => (
-              <DropdownRow
-                key={name}
-                onPress={() => { selectionHaptic(); setQuickPayer(name); setQuickPayerDropOpen(false); }}
-                divider={i > 0}
-                trailing={quickPayer === name ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
-              >
-                <Text style={s.scopeDropItemText}>{name === myName ? `${name} (me)` : name}</Text>
-              </DropdownRow>
-            ))}
-          </Dropdown>
-        </View>
-      </>
 
-      <View style={s.footer}>
-        <Button
-          variant="primary"
-          size="big"
-          label="Add"
-          icon={<PlusIcon color={C.text} size={18} />}
-          disabled={quickAddStarted}
-          onPress={() => { mediumHaptic(); setShowAddSheet(true); }}
-        />
-      </View>
+      <GroupActionsMenu
+        visible={actionsMenu}
+        onDismiss={() => setActionsMenu(false)}
+        closeLabel="Close trip"
+        onEdit={() => { requestGroupEdit(trip.id); router.back(); }}
+        onShare={() => setShareModal(true)}
+        onCloseGroup={() => { closeTrip(trip.id); router.dismiss(2); }}
+        onDelete={() => setDeleteConfirm(true)}
+      />
+      <ShareCodeModal
+        visible={shareModal}
+        onClose={() => setShareModal(false)}
+        title="Share trip"
+        code={trip.joinCode}
+        message={`Join my trip "${trip.name}" on Tab Rat! Code: ${trip.joinCode}`}
+      />
+      <ConfirmModal
+        visible={deleteConfirm}
+        onClose={() => setDeleteConfirm(false)}
+        onConfirm={() => {
+          mediumHaptic();
+          setDeleteConfirm(false);
+          deleteTrip(trip.id);
+          router.replace('/(tabs)/trips' as any);
+        }}
+        title="Delete trip?"
+        body={`This will permanently remove "${trip.name}" and all its expenses.`}
+        confirmLabel="Delete"
+        confirmVariant="destructive"
+      />
+
+      <QuickAddBar people={tripPeople} myName={myName} currency={quickExpenseCurrency} onSave={handleQuickSave}
+        addLabel="Add" onAdd={() => { mediumHaptic(); setShowAddSheet(true); }} footerStyle={s.footer} />
 
       {/* Add sheet — the app's own design, used on every platform. Native ActionSheetIOS/Alert
           menus render in the OS's own chrome (dark, rounded, no icons/descriptions) rather than
@@ -668,7 +624,7 @@ export default function TripExpensesScreen() {
           {[
             { label: 'Expense', desc: 'Log a single cost without a receipt', badgeBg: AVATAR_PALETTE[4].bg, color: AVATAR_PALETTE[4].text, Icon: ExpenseIcon, onPress: () => { setShowAddSheet(false); router.push({ pathname: '/trip/manual-entry' as any, params: { tripId: tripId!, direct: 'true' } }); } },
             { label: 'Bill', desc: 'Scan or upload a new receipt to split', badgeBg: C.billBg, color: C.billFg, Icon: BillTypeIcon, onPress: () => { setShowAddSheet(false); startTripEntry(tripId!); router.push('/upload'); } },
-            { label: 'Link Bill', desc: 'Connect a bill you already split to this trip', badgeBg: AVATAR_PALETTE[3].bg, color: AVATAR_PALETTE[3].text, Icon: LinkIcon, onPress: () => { setShowAddSheet(false); router.push({ pathname: '/trip/expense' as any, params: { tripId: tripId!, showImport: 'true' } }); } },
+            { label: 'Link bill', desc: 'Connect a bill you already split to this trip', badgeBg: AVATAR_PALETTE[3].bg, color: AVATAR_PALETTE[3].text, Icon: LinkIcon, onPress: () => { setShowAddSheet(false); router.push({ pathname: '/trip/expense' as any, params: { tripId: tripId!, showImport: 'true' } }); } },
           ].map((a) => (
             <Card key={a.label} style={s.sheetOption} onPress={a.onPress} pressBorderColor={a.badgeBg}>
               <IconBadge bg={a.badgeBg}>
@@ -710,7 +666,7 @@ const s = StyleSheet.create({
   feedTotal: { ...Type.cardTitle, color: C.text },
 
   emptySection: { paddingVertical: 20, alignItems: 'center' },
-  emptySectionText: { ...Type.cardDesc, color: C.textDim },
+  emptySectionText: { ...Type.note, color: C.textDim },
 
   // Footer
   footer: { padding: 16, paddingTop: 4 },
@@ -746,23 +702,6 @@ const s = StyleSheet.create({
   dayBadgeNumActive: { fontFamily: 'Poppins_900Black', color: C.text },
   dayBadgeNumOutTrip: { color: C.textDim },
 
-  quickAddRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginHorizontal: 16, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 8,
-    backgroundColor: C.bg, borderRadius: 14,
-    boxShadow: '0px 4px 12px rgba(0,0,0,0.12)', elevation: 6,
-  },
-  quickAddFieldActive: { borderColor: C.text },
-  quickAddNameCard: { flex: 1, height: InputMetrics.height, justifyContent: 'center', borderWidth: 1.5, borderColor: C.border },
-  quickAddNameInput: { ...Type.labelMedium, color: C.text, paddingHorizontal: 12 },
-  quickAddAmountCard: { width: 66, height: InputMetrics.height, justifyContent: 'center', borderWidth: 1.5, borderColor: C.border },
-  quickAddAmountInner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 2 },
-  quickAddAmountInput: { flex: 1, minWidth: 0, ...Type.pillLabel, color: C.text, padding: 0 },
-  quickAddPayerBtn: {
-    width: 62, height: InputMetrics.height, alignItems: 'center', justifyContent: 'center',
-    borderRadius: InputMetrics.radius, backgroundColor: C.card, borderWidth: 1.5, borderColor: C.border,
-  },
-  quickAddPayerText: { fontFamily: 'Poppins_500Medium', fontSize: 12, color: C.text },
 });
 
 const qst = StyleSheet.create({

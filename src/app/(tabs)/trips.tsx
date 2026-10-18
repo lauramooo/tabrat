@@ -14,7 +14,7 @@ if (Platform.OS !== 'web') {
 }
 
 function toInputDate(str: string): string {
-  const d = new Date(str);
+  const d = parseLocalDate(str);
   if (isNaN(d.getTime())) return '';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -30,7 +30,7 @@ import { Type } from '@/constants/typography';
 import { Badge, InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { calculateTripSettlement, fmt } from '@/utils/calculator';
-import { fmtDate } from '@/utils/date';
+import { fmtDate, parseLocalDate } from '@/utils/date';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import type { Trip } from '@/types';
 import { ActionPill } from '@/components/ActionPill';
@@ -81,7 +81,7 @@ function TripQuickModal({ trip, onClose }: { trip: Trip; onClose: () => void }) 
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const parsedStart = (() => { const d = new Date(live.startDate); return isNaN(d.getTime()) ? new Date() : d; })();
+  const parsedStart = (() => { const d = parseLocalDate(live.startDate); return isNaN(d.getTime()) ? new Date() : d; })();
   const parsedEnd = (() => { const d = new Date(live.endDate ?? ''); return isNaN(d.getTime()) ? new Date() : d; })();
 
   const flash = () => {

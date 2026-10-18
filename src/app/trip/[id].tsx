@@ -1,11 +1,9 @@
 import { PressBtn } from '@/components/PressBtn';
-import { BillTypeIcon, CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, ExpenseIcon, LinkIcon, MoneyIcon, MoreIcon, PencilIcon, PlusCircleIcon, PlusIcon, ReopenIcon, SearchIcon, SendIcon, SortIcon, TrashIcon, UserIcon } from '@/components/FigmaIcons';
+import { BillTypeIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, LinkIcon, MoneyIcon, MoreIcon, PencilIcon, PlusCircleIcon, PlusIcon, ReopenIcon, SearchIcon, SendIcon, SortIcon, TrashIcon, UserIcon, UserMultipleIcon } from '@/components/FigmaIcons';
 import { ShareCodeModal } from '@/components/ShareCodeModal';
-import { ScreenHeaderTitle, ScreenSubHeader } from '@/components/FlowSteps';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActionSheetIOS, Alert, Dimensions, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet,
@@ -16,14 +14,18 @@ import Svg, { G, Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProgressBar, Text } from 'react-native-paper';
 import { Avatar } from '@/components/Avatar';
-import { Button, Card, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, CurrencyPickerList, DateRangeCalendarModal, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, IconBadge, Input, PayModal, RunningTotalsCard, SearchInput, SettlementRow } from '@/components/design';
+import { GroupHeader } from '@/components/GroupHeader';
+import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
+import { takeGroupEditRequest } from '@/utils/pendingGroupEdit';
+import { QuickAddBar } from '@/components/QuickAddBar';
+import { Button, Card, EmptyHint, EmptyPie, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, CurrencyPickerList, DateRangeField, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, IconBadge, Input, PayModal, RunningTotalsCard, SearchInput, SettlementRow } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { calculateTripSettlement, fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator';
-import { fmtDateRange } from '@/utils/date';
+import { fmtDate } from '@/utils/date';
 import { getCategoryData } from '@/utils/categoryColors';
 import { convertToBase, useExchangeRates } from '@/utils/currency';
 import { layoutPieSegments, roundedSegmentPath } from '@/utils/pieLayout';
@@ -77,6 +79,8 @@ function PieDonut({ data, centerText, currency }: {
 }) {
   const [tooltip, setTooltip] = useState<{ label: string; value: number; textColor: string } | null>(null);
   const wasLongPress = useRef(false);
+  const toggleTooltip = (d: { label: string; value: number; textColor: string }) =>
+    setTooltip((prev) => (prev?.label === d.label ? null : { label: d.label, value: d.value, textColor: d.textColor }));
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0 || data.length === 0) return null;
   const radius = (PIE_SIZE - PIE_RING) / 2;
@@ -103,22 +107,25 @@ function PieDonut({ data, centerText, currency }: {
                 key={d.label}
                 d={roundedSegmentPath(center, center, innerR, outerR, startAngle, endAngle, PIE_CORNER)}
                 fill={d.color}
-                onPressIn={() => { wasLongPress.current = false; }}
-                onPress={() => {
-                  lightHaptic();
-                  setTooltip((prev) => (prev?.label === d.label ? null : { label: d.label, value: d.value, textColor: d.textColor }));
-                }}
-                onLongPress={() => { wasLongPress.current = true; lightHaptic(); setTooltip({ label: d.label, value: d.value, textColor: d.textColor }); }}
-                {...(Platform.OS !== 'web' ? { onPressOut: () => { if (wasLongPress.current) { setTooltip(null); wasLongPress.current = false; } } } : null)}
+                // react-native-svg's web shapes are plain DOM elements: RN press/responder props
+                // aren't valid on them (each logs "Unknown event handler property" and never
+                // fires), so web gets a DOM click that toggles the tooltip instead. onPress must
+                // be an explicit null there — the web shim otherwise overwrites onClick with it.
+                {...(Platform.OS === 'web' ? {
+                  onPress: null as any,
+                  onClick: () => toggleTooltip(d),
+                } : {
+                  onPressIn: () => { wasLongPress.current = false; },
+                  onPress: () => { lightHaptic(); toggleTooltip(d); },
+                  onLongPress: () => { wasLongPress.current = true; lightHaptic(); setTooltip({ label: d.label, value: d.value, textColor: d.textColor }); },
+                  onPressOut: () => { if (wasLongPress.current) { setTooltip(null); wasLongPress.current = false; } },
+                })}
               />
             );
           })}
         </G>
       </Svg>
-      <View style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        justifyContent: 'center', alignItems: 'center', pointerEvents: 'none',
-      }}>
+      <View style={s.pieCenterOverlay}>
         {tooltip ? (
           <View style={s.pieTooltip}>
             <Text style={[s.pieTooltipAmt, { color: tooltip.textColor }]}>{fmt(tooltip.value, currency)}</Text>
@@ -148,7 +155,6 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
   const [emoji, setEmoji] = useState('✈️');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [dateModalOpen, setDateModalOpen] = useState(false);
   const [currencies, setCurrencies] = useState<string[]>(['USD']);
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [currencyDropPos, setCurrencyDropPos] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -236,23 +242,11 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
     >
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: SCREEN_H * 0.6 }}>
         <FieldLabel>DATES</FieldLabel>
-        <PressBtn style={[s.editDateBox, { marginBottom: 16 }]} onPress={() => setDateModalOpen(true)} activeOpacity={0.8}>
-          <CalendarIcon size={15} color={C.text} />
-          <Text style={[s.editDateText, !startDate && { color: C.textDim }]} numberOfLines={1}>
-            {startDate ? fmtDateRange(startDate, endDate) : 'Choose date(s)'}
-          </Text>
-          {startDate ? (
-            <PressBtn onPress={() => { setStartDate(''); setEndDate(''); }} hitSlop={10}>
-              <CloseCircleIcon size={15} color={C.textDim} />
-            </PressBtn>
-          ) : null}
-        </PressBtn>
-        <DateRangeCalendarModal
-          visible={dateModalOpen}
+        <DateRangeField
           startDate={startDate}
           endDate={endDate}
-          onConfirm={(s, e) => { setStartDate(s); setEndDate(e); setDateModalOpen(false); }}
-          onClose={() => setDateModalOpen(false)}
+          onChange={(st, en) => { setStartDate(st); setEndDate(en); }}
+          style={{ marginBottom: 16 }}
         />
         <FieldLabel>CURRENCY</FieldLabel>
         <Card padding={0} row={false} radius={10} style={{ marginBottom: 16 }}>
@@ -386,7 +380,7 @@ function EditTripModal({ visible, trip, myName, onClose, onSave, onLivePreview }
                 {filteredGroups.map((g) => (
                   <DropdownRow
                     key={g.id}
-                    icon={<Text style={{ fontSize: 14, width: 16, textAlign: 'center' }}>{g.icon}</Text>}
+                    icon={<UserMultipleIcon size={15} color={C.textSub} />}
                     onPress={() => { addGroup(g); setFriendSearch(''); setFriendDropOpen(false); }}
                   >
                     <Text style={s.friendDropName}>{g.name}</Text>
@@ -561,8 +555,7 @@ export default function TripDetailScreen() {
   // The actions menu renders in a full-screen Modal, ignoring the header's own layout — position
   // it using the safe-area inset plus the standard native header content height so it lands just
   // under the header button regardless of device, matching BillHeader's actions menu.
-  const actionsTop = insets.top + (Platform.OS === 'ios' ? 44 : 56) + 6;
-  const { trips, history, tripPayments, updateTrip, deleteTrip, addTripPayment, removeTripPaymentsFor, closeTrip } = useSplitStore();
+  const { trips, history, tripPayments, updateTrip, deleteTrip, addTripPayment, removeTripPaymentsFor, closeTrip, saveTripExpenseDirectly } = useSplitStore();
   const [scopePerson, setScopePerson] = useState(''); // '' = everyone, else = person name
   const [scopeDropOpen, setScopeDropOpen] = useState(false);
   const scopeBtnRef = useRef<PressBtn>(null);
@@ -572,6 +565,8 @@ export default function TripDetailScreen() {
   const [editHeaderPreview, setEditHeaderPreview] = useState<{ name: string; startDate: string; endDate: string } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [actionsModal, setActionsModal] = useState(false);
+  // Edit picked from the Expenses tab's ⋮ menu lands back here with the edit form open.
+  useFocusEffect(useCallback(() => { if (takeGroupEditRequest(id!)) setEditModalVisible(true); }, [id]));
   const [shareModal, setShareModal] = useState(false);
   const [payModal, setPayModal] = useState<{ from: string; to: string; amount: number } | null>(null);
   const [reopenConfirm, setReopenConfirm] = useState<{ from: string; to: string } | null>(null);
@@ -736,35 +731,16 @@ export default function TripDetailScreen() {
         headerLeft: () => (
           <CircleIconButton variant="back" size={28} color={C.primary} onPress={() => router.back()} style={{ paddingHorizontal: 12 }} />
         ),
-        headerRight: () => (
-          <PressBtn onPress={() => setActionsModal(true)} activeOpacity={0.5} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
-            <MoreIcon color={C.text} size={20} />
-          </PressBtn>
-        ),
+        headerRight: () => <GroupActionsButton onPress={() => setActionsModal(true)} />,
       }} />
-      <ScreenSubHeader>
-        <ScreenHeaderTitle
-          name={editHeaderPreview?.name || trip.name}
-          date={editHeaderPreview ? editHeaderPreview.startDate : trip.startDate}
-          endDate={editHeaderPreview ? editHeaderPreview.endDate : trip.endDate}
-        />
-      </ScreenSubHeader>
-
-      {/* ── Friend bubbles strip ── */}
-      {tripPeople.length > 0 && (
-        <View style={s.friendStrip}>
-          {tripPeople.slice(0, 8).map((pName, i) => (
-            <Avatar
-              key={pName}
-              name={pName}
-              index={i}
-              size={18}
-              fontSize={8}
-              style={[s.hdrAvatar, { marginLeft: i === 0 ? 0 : -5, zIndex: 10 - i }]}
-            />
-          ))}
-        </View>
-      )}
+      <GroupHeader
+        name={editHeaderPreview?.name || trip.name}
+        date={editHeaderPreview ? editHeaderPreview.startDate : trip.startDate}
+        endDate={editHeaderPreview ? editHeaderPreview.endDate : trip.endDate}
+        people={tripPeople}
+        active="dashboard"
+        onSelectTab={() => { selectionHaptic(); router.push({ pathname: '/trip/expenses' as any, params: { tripId: id! } }); }}
+      />
 
       {/* ── Total + person scope dropdown (fixed, above scroll) ── */}
       <View style={s.totalBar}>
@@ -826,6 +802,13 @@ export default function TripDetailScreen() {
                 </View>
               )}
             </View>
+          </View>
+        )}
+
+        {/* ── Empty trip: each section's heading with a hint of what will show up there ── */}
+        {tabs.length === 0 && (
+          <View style={[s.section, { paddingTop: 4 }]}>
+            <EmptyPie size={PIE_SIZE} ring={PIE_RING} centerText={`${getCurrencySymbol(tripCurrency)}0`} text="Add expenses to see where the money goes." />
           </View>
         )}
 
@@ -899,6 +882,13 @@ export default function TripDetailScreen() {
           </View>
         )}
 
+        {tabs.length === 0 && (
+          <View style={s.section}>
+            <Text style={s.sectionLabel}>WHO OWES WHO</Text>
+            <EmptyHint text="Nothing here yet" />
+          </View>
+        )}
+
         {/* ── Dashboard: Paid / closed debts ── */}
         {visibleClosedSettlement.length > 0 && (
           <View style={s.section}>
@@ -952,32 +942,39 @@ export default function TripDetailScreen() {
           </View>
         )}
 
-        {tabs.length > 0 && visibleSettlement.length === 0 && personTotals.length > 0 && (
+        {personTotals.length === 0 && (
+          <View style={s.section}>
+            <Text style={s.sectionLabel}>RUNNING TOTALS</Text>
+            <EmptyHint text="Nothing here yet" />
+          </View>
+        )}
+
+        {/* Only when an expense really has no payer — a one-person trip (or everyone even) has no debts either. */}
+        {tabs.length > 0 && visibleSettlement.length === 0 && tabs.some((t) => !t.paidByName && !t.paidById) && (
           <Text style={s.noSettlementNote}>Set a payer on each expense to see who owes who.</Text>
         )}
 
         <View style={{ height: 8 }} />
       </ScrollView>
 
-      <View style={[s.footer, { flexDirection: 'row', gap: 10 }]}>
-        <Button
-          variant="primary"
-          size="big"
-          label="Expenses"
-          icon={<ExpenseIcon color={C.text} size={18} />}
-          onPress={() => { selectionHaptic(); router.push({ pathname: '/trip/expenses' as any, params: { tripId: id! } }); }}
-          style={{ flex: 1 }}
-        />
-        {/* Quick-add — jumps straight to logging an expense without going through the expenses
-            list page first, for the common case of just wanting to add one thing fast. */}
-        <PressBtn
-          style={s.quickAddCircle}
-          onPress={() => { selectionHaptic(); router.push({ pathname: '/trip/manual-entry' as any, params: { tripId: id!, direct: 'true' } }); }}
-          activeOpacity={0.85}
-        >
-          <PlusIcon color={C.text} size={22} />
-        </PressBtn>
-      </View>
+      <QuickAddBar
+        people={tripPeople}
+        myName={myName}
+        currency={(trip.currencies ?? (trip.currency ? [trip.currency] : ['USD']))[0]}
+        onSave={({ name, amount, payer }) => saveTripExpenseDirectly({
+          name,
+          receiptDate: fmtDate(new Date()),
+          category: null,
+          rawItems: [{ name, price: amount, quantity: 1 }],
+          participants: tripPeople,
+          paidByName: payer,
+          tripId: id!,
+          currency: (trip.currencies ?? (trip.currency ? [trip.currency] : ['USD']))[0],
+        })}
+        addLabel="Add expense"
+        onAdd={() => { selectionHaptic(); router.push({ pathname: '/trip/manual-entry' as any, params: { tripId: id!, direct: 'true' } }); }}
+        footerStyle={s.footer}
+      />
 
       <FriendsModal visible={friendsModalVisible} people={tripPeople}
         onClose={() => setFriendsModalVisible(false)} onSave={handleSaveFriends} />
@@ -1003,28 +1000,15 @@ export default function TripDetailScreen() {
       )}
 
       {/* ── Actions menu ── */}
-      <Modal visible={actionsModal} transparent animationType="fade" onRequestClose={() => setActionsModal(false)}>
-        <Pressable style={s.actionsBackdrop} onPress={() => setActionsModal(false)}>
-          <View style={[s.actionsCard, { top: actionsTop }]}>
-            <PressBtn style={s.actionsRow} onPress={() => { setActionsModal(false); setEditModalVisible(true); }} activeOpacity={0.6}>
-              <PencilIcon color={C.textSub} size={17} />
-              <Text style={s.actionsRowText}>Edit</Text>
-            </PressBtn>
-            <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); setShareModal(true); }} activeOpacity={0.6}>
-              <SendIcon color={C.textSub} size={17} />
-              <Text style={s.actionsRowText}>Share</Text>
-            </PressBtn>
-            <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); closeTrip(trip.id); router.back(); }} activeOpacity={0.6}>
-              <CheckCircleIcon color={C.textSub} size={17} />
-              <Text style={s.actionsRowText}>Close trip</Text>
-            </PressBtn>
-            <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); setDeleteConfirm(true); }} activeOpacity={0.6}>
-              <TrashIcon color={C.error} size={17} />
-              <Text style={[s.actionsRowText, { color: C.error }]}>Delete</Text>
-            </PressBtn>
-          </View>
-        </Pressable>
-      </Modal>
+      <GroupActionsMenu
+        visible={actionsModal}
+        onDismiss={() => setActionsModal(false)}
+        closeLabel="Close trip"
+        onEdit={() => setEditModalVisible(true)}
+        onShare={() => setShareModal(true)}
+        onCloseGroup={() => { closeTrip(trip.id); router.back(); }}
+        onDelete={() => setDeleteConfirm(true)}
+      />
 
       <ShareCodeModal
         visible={shareModal}
@@ -1072,9 +1056,7 @@ const s = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingBottom: 16 },
 
-  friendStrip: { flexDirection: 'row', justifyContent: 'center', paddingTop: 0, paddingBottom: 4 },
   hdrAvatarRow: { flexDirection: 'row', marginTop: 4 },
-  hdrAvatar: { width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: C.bg },
 
   // Total bar + scope dropdown
   totalBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
@@ -1085,11 +1067,6 @@ const s = StyleSheet.create({
   scopeDropItemText: { ...Type.labelMedium, color: C.text },
 
   // Actions dropdown
-  actionsBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
-  actionsCard: { position: 'absolute', right: 10, backgroundColor: C.bg, borderRadius: 14, width: 210, overflow: 'hidden' },
-  actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
-  actionsRowText: { ...Type.bodySmall, color: C.text },
-  actionsRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border },
 
   // Sections
   section: { paddingHorizontal: 16, paddingTop: 16 },
@@ -1109,12 +1086,15 @@ const s = StyleSheet.create({
   legendLabel: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 11, color: C.text },
   legendAmt: { ...Type.cardTitle, color: C.text, width: 62 },
   pieCenterText: { fontFamily: 'Poppins_900Black', fontSize: 12, color: C.text, textAlign: 'center' },
+  // pointerEvents must live in a StyleSheet: react-native-web drops it from an inline style object,
+  // and this overlay then swallowed every tap meant for the pie slices underneath.
+  pieCenterOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', pointerEvents: 'none' },
   pieTooltip: { alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, boxShadow: '0px 3px 8px rgba(0,0,0,0.15)', elevation: 5 },
   pieTooltipAmt: { fontFamily: 'Poppins_900Black', fontSize: 13 },
   pieTooltipLabel: { fontFamily: 'Poppins_500Medium', fontSize: 10, color: C.textSub, maxWidth: 80 },
-  noDataNote: { ...Type.cardDesc, color: C.textDim, textAlign: 'center', paddingVertical: 16 },
+  noDataNote: { ...Type.note, color: C.textDim, textAlign: 'center', paddingVertical: 16 },
 
-  noSettlementNote: { ...Type.cardDesc, color: C.textDim, textAlign: 'center', marginTop: 12, marginHorizontal: 16, fontStyle: 'italic' },
+  noSettlementNote: { ...Type.note, color: C.textDim, textAlign: 'center', marginTop: 12, marginHorizontal: 16 },
 
 
   emptyScreen: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -1122,14 +1102,12 @@ const s = StyleSheet.create({
 
   // Footer
   footer: { padding: 16, paddingTop: 8 },
-  quickAddCircle: { width: 54, height: 54, borderRadius: 27, backgroundColor: C.yellow, justifyContent: 'center', alignItems: 'center' },
 
   // Modals (shared)
   modalTitle: { ...Type.cardTitle, color: C.text, marginBottom: 16, flexShrink: 1 },
 
   editInput: { ...Type.labelMedium },
   editDateRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: InputMetrics.height },
-  editDateBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: InputMetrics.radius, height: InputMetrics.height, paddingHorizontal: 14 },
   editDateText: { flex: 1, minWidth: 0, ...Type.bodySmall, color: C.text },
   moneyPrefix: { ...Type.bodySmall, color: C.textSub },
   moneyCard: { marginBottom: 16, borderWidth: 1.5, borderColor: 'transparent' },
@@ -1137,7 +1115,7 @@ const s = StyleSheet.create({
   friendListName: { flex: 1, ...Type.labelMedium, color: C.text },
   friendAddRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: InputMetrics.height, gap: 10 },
   friendAddInput: { flex: 1, minWidth: 0, ...Type.labelMedium, color: C.text },
-  friendDropName: { flex: 1, ...Type.labelMedium, color: C.text },
+  friendDropName: { ...Type.labelMedium, color: C.text },
   friendDropSub: { ...Type.cardDesc, color: C.textDim },
   addPersonBtn: { width: 46, height: 46, borderRadius: 10, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center' },
   friendQuickChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: C.card },

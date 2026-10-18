@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Platform, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { ScissorIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
+import { Radius } from '@/constants/spacing';
 import { Type } from '@/constants/typography';
 
 const CARD_W = 230;
@@ -65,21 +67,87 @@ export function ScissorAnimation({ label }: { label?: string }) {
   );
 }
 
-export function ScanningOverlay() {
+// A long multi-guest receipt takes 20-30s to read accurately (see scan-receipt), and there's no
+// real progress to report — so the message advances on a timer instead, to show it isn't stuck.
+const SCAN_MESSAGES: [number, string][] = [
+  [0, 'Reading your receipt…'],
+  [8000, 'Still reading — long receipts take a little longer'],
+  [20000, 'Almost there, checking every price…'],
+];
+
+const SCAN_LINE_H = 3;
+const SCAN_GLOW_H = 28;
+
+// Sits over the receipt photo while it's being read: dims the photo and sweeps a glowing scan line
+// up and down `frame` (the crop box, so it scans what's actually being sent), with the timed status
+// message on top. Absorbs touches so the crop handles can't move mid-scan.
+export function ScanningOverlay({ frame }: { frame: { top: number; left: number; width: number; height: number } }) {
+  const [label, setLabel] = useState(SCAN_MESSAGES[0][1]);
+  const sweep = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const timers = SCAN_MESSAGES.slice(1).map(([ms, text]) => setTimeout(() => setLabel(text), ms));
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sweep, { toValue: 1, duration: 1500, useNativeDriver: NATIVE_DRIVER }),
+        Animated.timing(sweep, { toValue: 0, duration: 1500, useNativeDriver: NATIVE_DRIVER }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [sweep]);
+
+  const lineY = sweep.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(0, frame.height - SCAN_LINE_H)] });
+
   return (
-    <View style={s.overlay}>
-      <ScissorAnimation label="Reading your receipt…" />
+    <View style={[StyleSheet.absoluteFill, s.scanDim]} onStartShouldSetResponder={() => true}>
+      <View style={[s.scanFrame, frame]}>
+        <Animated.View style={[s.scanLineWrap, { transform: [{ translateY: lineY }] }]}>
+          <LinearGradient colors={[`${C.yellow}00`, `${C.yellow}55`]} style={s.scanGlow} />
+          <View style={s.scanLine} />
+          <LinearGradient colors={[`${C.yellow}55`, `${C.yellow}00`]} style={s.scanGlow} />
+        </Animated.View>
+      </View>
+      <View style={s.scanLabelPill}>
+        <Text style={s.scanLabel}>{label}</Text>
+      </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(245,244,240,0.97)',
-    justifyContent: 'center',
+  scanDim: { backgroundColor: `${C.primary}40` },
+  scanFrame: { position: 'absolute', overflow: 'hidden' },
+  scanLineWrap: { position: 'absolute', left: 0, right: 0, top: -SCAN_GLOW_H },
+  scanGlow: { height: SCAN_GLOW_H },
+  scanLine: {
+    height: SCAN_LINE_H,
+    backgroundColor: C.yellow,
+    shadowColor: C.yellow,
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  scanLabelPill: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
     alignItems: 'center',
-    gap: 30,
+  },
+  scanLabel: {
+    ...Type.labelMedium,
+    color: C.text,
+    backgroundColor: C.card,
+    textAlign: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
   },
   card: {
     width: CARD_W,

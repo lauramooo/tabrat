@@ -31,6 +31,7 @@ Rules:
     1 Salad                   9.00
   becomes exactly this "items" array (two items, not four):
     [{"name": "Burger", "price": 14.00, "quantity": 1, "modifiers": ["with fries", "add bacon"]}, {"name": "Salad", "price": 9.00, "quantity": 1}]
+- Prices: each price belongs to the item on its own printed line. Many receipts print items with no price at all (water, free refills, an included side) — those items are $0. Never move a price from a neighboring line onto an item that has none; if you are unsure which line a price sits on, compare its vertical position to the item names closely before deciding.
 - quantity: number of units for that item (e.g. 2 for "2x Burger"). Default 1 if not shown.
 - price: the TOTAL price for that line, including any merged modifier price (quantity × unit price + modifiers). Read each digit carefully.
 - extraCharges: any named charge on the receipt that is NOT tax and NOT tip — service charge, delivery fee, credit card surcharge, bag fee, etc. — as its own entry with its printed name and amount. Discounts/coupons also go here with isDiscount:true and a positive amount (the amount that gets subtracted). Never fold these into subtotal, tax, or items — list every one so nothing printed on the receipt goes untracked. Empty array if there are none.
@@ -182,11 +183,13 @@ export async function parseReceiptViaProxy(
   base64Image: string,
   supabaseUrl: string,
   accessToken: string,
+  signal?: AbortSignal,
 ): Promise<ParsedReceipt> {
   // Long multi-guest receipts legitimately take 20-30s (thinking is on for accuracy), so this is
   // only a backstop against a hung request — generous enough never to cut off a real read.
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 90_000);
+  signal?.addEventListener('abort', () => controller.abort());
   const response = await fetch(`${supabaseUrl}/functions/v1/scan-receipt`, {
     signal: controller.signal,
     method: 'POST',
@@ -196,6 +199,9 @@ export async function parseReceiptViaProxy(
     },
     body: JSON.stringify({ image: base64Image }),
   }).catch((e) => {
+    // A user cancel (the caller's signal) rethrows as-is so the caller can stay silent; only our
+    // own timeout turns into the friendly unreadable message.
+    if (signal?.aborted) throw e;
     throw controller.signal.aborted ? new Error(UNREADABLE_RECEIPT) : e;
   }).finally(() => clearTimeout(timeout));
 

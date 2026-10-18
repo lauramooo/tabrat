@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ExtraCharge, Group, Home, OpenClosedStatus, ParsedReceipt, Payer, PaymentStatus, Person, ReceiptItem, SplitRecord, Trip } from '@/types';
 import { fmtDate } from '@/utils/date';
+import { extrasTotal } from '@/utils/items';
 import { generateJoinCode } from '@/utils/joinCode';
 import {
   syncDeleteFriend, syncDeleteGroup, syncDeleteHome, syncDeleteHomePaymentsFor, syncDeleteSplitRecord,
@@ -48,13 +49,18 @@ interface SplitState {
   itemCategories: string[];
   defaultCurrency: string;
 
-  setImage: (uri: string, base64: string) => void;
+  setImage: (uri: string | null, base64: string | null) => void;
   setReceiptData: (data: ParsedReceipt) => void;
   updateItem: (id: string, name: string, price: number, quantity: number, category?: string) => void;
   addItemWithDetails: (name: string, price: number, quantity?: number, category?: string) => void;
   setItemCategory: (id: string, category: string | undefined) => void;
   addItemCategory: (cat: string) => void;
   removeItem: (id: string) => void;
+  // Folds one line item into another (e.g. a separately-printed "Grilled Corn" into the steak it
+  // came with): the source moves into the target's `extras` and its price is added to the target's.
+  combineItems: (sourceId: string, targetId: string) => void;
+  // Reverses combineItems for one extra: back to its own line, right after the item it was in.
+  separateExtra: (itemId: string, extraId: string) => void;
   setItemOrder: (ids: string[]) => void;
   splitItemQty: (id: string) => void;
   splitItemQtyAssigned: (id: string, assignees: string[][]) => void;
@@ -84,7 +90,7 @@ interface SplitState {
   deleteHistory: (id: string) => void;
   loadSplit: (record: SplitRecord, viewMode?: boolean) => void;
   // Open/closed status for saved tabs (settle-up state, not just "exists in history").
-  updateRecord: (id: string, patch: { restaurantName?: string; receiptDate?: string; expenseCategory?: string }) => void;
+  updateRecord: (id: string, patch: { restaurantName?: string; receiptDate?: string; receiptEndDate?: string; expenseCategory?: string; imageUri?: string }) => void;
   closeTab: (id: string) => void;
   reopenTab: (id: string) => void;
   // Per-person settle-up tracking on a saved tab ("mark as paid").
@@ -98,6 +104,7 @@ interface SplitState {
   saveHomeExpenseDirectly: (params: {
     name: string;
     receiptDate: string;
+    receiptEndDate?: string;
     category: string | null;
     amount: number;
     participants: string[];
@@ -134,6 +141,7 @@ interface SplitState {
   saveTripExpenseDirectly: (params: {
     name: string;
     receiptDate: string;
+    receiptEndDate?: string;
     category: string | null;
     rawItems: Array<{ name: string; price: number; quantity: number }>;
     participants: string[];
@@ -144,6 +152,54 @@ interface SplitState {
   }) => void;
   startTripEntry: (tripId: string) => void;
   setActiveTripId: (id: string | null) => void;
+}
+
+// The parts of a saved bill derived from what's being edited — shared by saveSplit (a new
+// record) and the subscription at the bottom of this file (keeping an already-saved bill in step).
+type BillSource = Pick<SplitState, 'items' | 'people' | 'tax' | 'tip' | 'extraCharges' | 'restaurantName' | 'receiptDate' | 'imageUri' | 'paidBy' | 'payers' | 'currency'>;
+function billContent(s: BillSource) {
+  const { items, people, tax, tip, extraCharges, paidBy, payers } = s;
+  const subtotal = items.reduce((sum, i) => sum + i.price, 0);
+  const extraTotal = extraCharges.reduce((sum, c) => sum + (c.isDiscount ? -c.amount : c.amount), 0);
+  const total = subtotal + tax + tip + extraTotal;
+
+  // Compute per-person totals for trip settlement
+  const personSubtotals: Record<string, number> = {};
+  people.forEach((p) => (personSubtotals[p.id] = 0));
+  for (const item of items) {
+    if (item.assignedTo.length === 0) continue;
+    const share = item.price / item.assignedTo.length;
+    for (const pid of item.assignedTo) {
+      if (pid in personSubtotals) personSubtotals[pid] += share;
+    }
+  }
+  const grandSub = Object.values(personSubtotals).reduce((a, b) => a + b, 0);
+  const personAmounts = people.map((p) => {
+    const sub = personSubtotals[p.id];
+    const ratio = grandSub > 0 ? sub / grandSub : 1 / (people.length || 1);
+    return { name: p.name, amount: sub + tax * ratio + tip * ratio + extraTotal * ratio };
+  });
+
+  return {
+    restaurantName: s.restaurantName || undefined,
+    receiptDate: s.receiptDate || undefined,
+    total,
+    people: people.map((p) => p.name),
+    itemCount: items.length,
+    items: items.map((i) => ({ ...i })),
+    fullPeople: people.map((p) => ({ ...p })),
+    extraCharges: extraCharges.map((c) => ({ ...c })),
+    tax,
+    tip,
+    imageUri: s.imageUri ?? undefined,
+    paidById: paidBy ?? undefined,
+    paidByName: paidBy ? (people.find((p) => p.id === paidBy)?.name) : undefined,
+    personAmounts,
+    currency: s.currency,
+    // A single payer always covers the whole bill — recomputed so an edited total can't leave a
+    // stale amount behind. Only a real multi-payer split keeps the amounts the user entered.
+    payers: payers.length > 1 ? payers.map((p) => ({ ...p })) : (paidBy ? [{ personId: paidBy, amount: total }] : undefined),
+  };
 }
 
 let idSeq = 0;
@@ -187,7 +243,13 @@ export const useSplitStore = create<SplitState>()(
       itemCategories: DEFAULT_ITEM_CATEGORIES,
       defaultCurrency: DEFAULT_CURRENCY,
 
-      setImage: (uri, base64) => set({ imageUri: uri, imageBase64: base64 }),
+      setImage: (uri, base64) => {
+        set({ imageUri: uri, imageBase64: base64 });
+        // An already-saved bill keeps its receipt photo on the record, so rescanning or removing it
+        // from an existing bill sticks.
+        const { savedSplitId, updateRecord } = get();
+        if (savedSplitId) updateRecord(savedSplitId, { imageUri: uri ?? undefined });
+      },
 
       setReceiptData: (data) => {
         const items: ReceiptItem[] = data.items.map((i) => ({
@@ -242,6 +304,43 @@ export const useSplitStore = create<SplitState>()(
 
       removeItem: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
 
+      combineItems: (sourceId, targetId) =>
+        set((s) => {
+          const source = s.items.find((i) => i.id === sourceId);
+          if (!source || sourceId === targetId) return {};
+          // Flatten: anything already added to the source comes along as its own extra, so every
+          // extra stays separable on its own and extras never nest.
+          const { extras: sourceExtras = [], ...sourceBase } = source;
+          const sourceBasePrice = Math.round((source.price - extrasTotal(source)) * 100) / 100;
+          return {
+            items: s.items
+              .filter((i) => i.id !== sourceId)
+              .map((i) => i.id === targetId
+                ? {
+                    ...i,
+                    price: Math.round((i.price + source.price) * 100) / 100,
+                    extras: [...(i.extras ?? []), { ...sourceBase, price: sourceBasePrice }, ...sourceExtras],
+                  }
+                : i),
+          };
+        }),
+
+      separateExtra: (itemId, extraId) =>
+        set((s) => {
+          const index = s.items.findIndex((i) => i.id === itemId);
+          const item = s.items[index];
+          const extra = item?.extras?.find((e) => e.id === extraId);
+          if (!item || !extra) return {};
+          const updated = {
+            ...item,
+            price: Math.round((item.price - extra.price) * 100) / 100,
+            extras: item.extras!.filter((e) => e.id !== extraId),
+          };
+          const items = [...s.items];
+          items.splice(index, 1, updated, extra);
+          return { items };
+        }),
+
       setItemOrder: (ids) =>
         set((s) => {
           const map = new Map(s.items.map((i) => [i.id, i]));
@@ -252,9 +351,12 @@ export const useSplitStore = create<SplitState>()(
         set((s) => {
           const item = s.items.find((i) => i.id === id);
           if (!item || item.quantity <= 1) return s;
-          const unitPrice = item.price / item.quantity;
-          const copies = Array.from({ length: item.quantity }, () => ({
-            ...item, id: uid(), quantity: 1, price: unitPrice, assignedTo: [],
+          // Added extras stay on the first copy only, so their price is counted exactly once.
+          const added = extrasTotal(item);
+          const unitPrice = (item.price - added) / item.quantity;
+          const copies = Array.from({ length: item.quantity }, (_, i) => ({
+            ...item, id: uid(), quantity: 1, price: unitPrice + (i === 0 ? added : 0), assignedTo: [],
+            extras: i === 0 ? item.extras : undefined,
           }));
           const idx = s.items.findIndex((i) => i.id === id);
           return { items: [...s.items.slice(0, idx), ...copies, ...s.items.slice(idx + 1)] };
@@ -264,9 +366,11 @@ export const useSplitStore = create<SplitState>()(
         set((s) => {
           const item = s.items.find((i) => i.id === id);
           if (!item || item.quantity <= 1) return s;
-          const unitPrice = item.price / item.quantity;
+          const added = extrasTotal(item);
+          const unitPrice = (item.price - added) / item.quantity;
           const copies = Array.from({ length: item.quantity }, (_, i) => ({
-            ...item, id: uid(), quantity: 1, price: unitPrice, assignedTo: assignees[i] ?? [],
+            ...item, id: uid(), quantity: 1, price: unitPrice + (i === 0 ? added : 0), assignedTo: assignees[i] ?? [],
+            extras: i === 0 ? item.extras : undefined,
           }));
           const idx = s.items.findIndex((i) => i.id === id);
           return { items: [...s.items.slice(0, idx), ...copies, ...s.items.slice(idx + 1)] };
@@ -390,52 +494,19 @@ export const useSplitStore = create<SplitState>()(
       reset: () => set({ ...initial, receiptDate: fmtDate(new Date()) }),
 
       saveSplit: () => {
-        const { items, people, tax, tip, extraCharges, restaurantName, receiptDate, imageUri, paidBy, payers, currency, splitSaved, activeTripId, activeHomeId, expenseCategory } = get();
-        if (splitSaved || (items.length === 0 && people.length === 0)) return;
-        const subtotal = items.reduce((s, i) => s + i.price, 0);
-        const extraTotal = extraCharges.reduce((s, c) => s + (c.isDiscount ? -c.amount : c.amount), 0);
-        const total = subtotal + tax + tip + extraTotal;
-
-        // Compute per-person totals for trip settlement
-        const personSubtotals: Record<string, number> = {};
-        people.forEach((p) => (personSubtotals[p.id] = 0));
-        for (const item of items) {
-          if (item.assignedTo.length === 0) continue;
-          const share = item.price / item.assignedTo.length;
-          for (const pid of item.assignedTo) {
-            if (pid in personSubtotals) personSubtotals[pid] += share;
-          }
-        }
-        const grandSub = Object.values(personSubtotals).reduce((a, b) => a + b, 0);
-        const personAmounts = people.map((p) => {
-          const sub = personSubtotals[p.id];
-          const ratio = grandSub > 0 ? sub / grandSub : 1 / (people.length || 1);
-          return { name: p.name, amount: sub + tax * ratio + tip * ratio + extraTotal * ratio };
-        });
+        const state = get();
+        const { people, splitSaved, savedSplitId, items, activeTripId, activeHomeId, expenseCategory } = state;
+        // A bill opened from history is already saved and kept up to date as it's edited.
+        if (splitSaved || savedSplitId || (items.length === 0 && people.length === 0)) return;
 
         const record: SplitRecord = {
+          ...billContent(state),
           id: uid(),
           date: new Date().toISOString(),
-          restaurantName: restaurantName || undefined,
-          receiptDate: receiptDate || undefined,
-          total,
-          people: people.map((p) => p.name),
-          itemCount: items.length,
-          items: items.map((i) => ({ ...i })),
-          fullPeople: people.map((p) => ({ ...p })),
-          extraCharges: extraCharges.map((c) => ({ ...c })),
-          tax,
-          tip,
-          imageUri: imageUri ?? undefined,
-          paidById: paidBy ?? undefined,
           tripId: activeTripId ?? undefined,
           homeId: activeHomeId ?? undefined,
-          personAmounts,
-          paidByName: paidBy ? (people.find((p) => p.id === paidBy)?.name) : undefined,
           expenseCategory: expenseCategory ?? undefined,
           status: 'open',
-          currency,
-          payers: payers.length > 0 ? payers : (paidBy ? [{ personId: paidBy, amount: total }] : undefined),
           paymentStatuses: people.map((p) => ({ personId: p.id, paid: false, amountPaid: 0 })),
           source: 'scan',
           joinCode: (!activeTripId && !activeHomeId) ? generateJoinCode() : undefined,
@@ -533,7 +604,7 @@ export const useSplitStore = create<SplitState>()(
         if (updated) syncUpsertHome(updated);
       },
 
-      saveHomeExpenseDirectly: ({ name, receiptDate, category, amount, participants, paidByName, homeId }) => {
+      saveHomeExpenseDirectly: ({ name, receiptDate, receiptEndDate, category, amount, participants, paidByName, homeId }) => {
         const n = participants.length || 1;
         const share = amount / n;
         const personIds = participants.map(() => uid());
@@ -543,6 +614,7 @@ export const useSplitStore = create<SplitState>()(
           date: new Date().toISOString(),
           restaurantName: name || undefined,
           receiptDate: receiptDate ? (fmtDate(receiptDate) || receiptDate) : undefined,
+          receiptEndDate: receiptEndDate || undefined,
           total: amount,
           people: participants,
           itemCount: 1,
@@ -750,7 +822,7 @@ export const useSplitStore = create<SplitState>()(
         syncProfileCategories({ homeExpenseCategories: get().homeExpenseCategories });
       },
 
-      saveTripExpenseDirectly: ({ name, receiptDate, category, rawItems, participants, paidByName, tripId, currency: expCurrency, imageUri }) => {
+      saveTripExpenseDirectly: ({ name, receiptDate, receiptEndDate, category, rawItems, participants, paidByName, tripId, currency: expCurrency, imageUri }) => {
         if (rawItems.length === 0) return;
         const total = rawItems.reduce((s, i) => s + i.price, 0);
         const n = participants.length || 1;
@@ -762,6 +834,7 @@ export const useSplitStore = create<SplitState>()(
           date: new Date().toISOString(),
           restaurantName: name || undefined,
           receiptDate: receiptDate ? (fmtDate(receiptDate) || receiptDate) : undefined,
+          receiptEndDate: receiptEndDate || undefined,
           total,
           people: participants,
           itemCount: rawItems.length,
@@ -816,7 +889,7 @@ export const useSplitStore = create<SplitState>()(
           payers: record.payers ? record.payers.map((p) => ({ ...p })) : [],
           currency: record.currency ?? DEFAULT_CURRENCY,
           splitSaved: viewMode,
-          savedSplitId: viewMode ? record.id : null,
+          savedSplitId: record.id,
         });
       },
     }),
@@ -827,3 +900,31 @@ export const useSplitStore = create<SplitState>()(
     },
   ),
 );
+
+// Keeps a bill that's already in history in step with edits made after opening it (items, people,
+// tax/tip, payer…) — before this, those edits only lived in the in-progress state and were lost.
+// Payment statuses carry over for people still on the bill; anyone newly added starts unpaid.
+let billSyncTimer: ReturnType<typeof setTimeout> | null = null;
+useSplitStore.subscribe((s, prev) => {
+  const id = s.savedSplitId;
+  if (!id || id !== prev.savedSplitId) return; // nothing open, or the bill was just loaded
+  if (s.items === prev.items && s.people === prev.people && s.tax === prev.tax && s.tip === prev.tip
+    && s.extraCharges === prev.extraCharges && s.paidBy === prev.paidBy && s.payers === prev.payers
+    && s.currency === prev.currency) return;
+
+  const content = billContent(s);
+  useSplitStore.setState((st) => ({
+    history: st.history.map((r) => {
+      if (r.id !== id) return r;
+      const statuses = r.paymentStatuses ?? [];
+      const paymentStatuses = s.people.map((p) => statuses.find((ps) => ps.personId === p.id) ?? { personId: p.id, paid: false, amountPaid: 0 });
+      return { ...r, ...content, paymentStatuses };
+    }),
+  }));
+  // Typing a price fires an update per keystroke — only the last one needs to reach the server.
+  if (billSyncTimer) clearTimeout(billSyncTimer);
+  billSyncTimer = setTimeout(() => {
+    const updated = useSplitStore.getState().history.find((r) => r.id === id);
+    if (updated) syncUpsertSplitRecord(updated);
+  }, 800);
+});

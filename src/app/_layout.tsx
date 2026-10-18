@@ -1,5 +1,4 @@
 import '../global.css';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CircleIconButton } from '@/components/design';
 import {
   Poppins_400Regular,
@@ -72,6 +71,9 @@ const paperTheme = {
     onError: '#FFFFFF',
     errorContainer: '#FDECEA',
     onErrorContainer: '#1A1A1A',
+    // Snackbars (undo combine, "Split saved") sit on C.card; Paper's default inverse text is
+    // near-white, which made their message unreadable.
+    inverseOnSurface: C.text,
   },
 };
 
@@ -168,13 +170,8 @@ export default function RootLayout() {
       <PaperProvider
         theme={paperTheme}
         settings={{
-          icon: ({ name, color, size }) => (
-            <MaterialCommunityIcons
-              name={name as keyof typeof MaterialCommunityIcons.glyphMap}
-              color={color}
-              size={size}
-            />
-          ),
+          // Only hand-picked Figma icons are used app-wide — never Paper's stock icon set.
+          icon: () => null,
         }}
       >
         <StatusBar style="dark" />
@@ -203,8 +200,12 @@ export default function RootLayout() {
           <Stack.Screen name="friends" options={{ title: 'Rats' }} />
           <Stack.Screen name="trip/new" options={{ title: 'New trip' }} />
           <Stack.Screen name="trip/[id]" options={{ title: 'Trips', headerBackTitle: 'Trips' }} />
+          {/* The Expenses tab of a trip/home — switching tabs is instant, not a slide to a new page. */}
+          <Stack.Screen name="trip/expenses" options={{ animation: 'none' }} />
+          <Stack.Screen name="home/expenses" options={{ animation: 'none' }} />
           <Stack.Screen name="trip/expense" options={{ title: 'Add expense' }} />
-          <Stack.Screen name="trip/manual-entry" options={{ title: 'Add expense', headerBackTitle: 'Trip' }} />
+          {/* Shown as a centered pop-up over the trip (fade, see-through backdrop) rather than a page. */}
+          <Stack.Screen name="trip/manual-entry" options={{ presentation: 'transparentModal', animation: 'fade', headerShown: false }} />
           <Stack.Screen name="trip/edit-categories" options={{ title: 'Edit categories' }} />
           <Stack.Screen name="expense-entry" options={{ title: 'New expense' }} />
           <Stack.Screen name="home/new" options={{ title: 'New home' }} />

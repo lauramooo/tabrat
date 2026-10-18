@@ -1,4 +1,3 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressBtn } from '@/components/PressBtn';
 import { CloseCircleIcon, FriendsIcon, MinusCircleIcon, PencilIcon, PlusCircleIcon, PlusIcon, ReorderIcon, TrashIcon } from '@/components/FigmaIcons';
 import { useRouter } from 'expo-router';
@@ -6,6 +5,8 @@ import { ScaleDecorator, NestableDraggableFlatList, NestableScrollContainer } fr
 import { useRef, useState } from 'react';
 import {
   Animated,
+  Platform,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -20,29 +21,40 @@ import { InputMetrics } from '@/constants/spacing';
 import { BillHeader, FlowSteps } from '@/components/FlowSteps';
 import { useSplitStore } from '@/store/useSplitStore';
 import { fmt, sanitizeNumberInput } from '@/utils/calculator';
+import { extrasTotal, itemDetailLabels } from '@/utils/items';
 import { lightHaptic, mediumHaptic } from '@/utils/haptics';
-import type { ExtraCharge } from '@/types';
+import type { ExtraCharge, ReceiptItem } from '@/types';
 
-type ItemData = { id: string; name: string; price: number; quantity: number; modifiers?: string[] };
+type ItemData = ReceiptItem;
 
 // -- Item row ------------------------------------------------------------------
 
 function ActionPill({
-  progress, icon, iconNode, label, color, textColor = C.text, onPress,
+  progress, iconNode, label, color, textColor = C.text, onPress,
 }: {
   progress: Animated.AnimatedInterpolation<number>;
-  icon?: string; iconNode?: (color: string) => React.ReactNode; label: string; color: string; textColor?: string; onPress: () => void;
+  iconNode: (color: string) => React.ReactNode; label: string; color: string; textColor?: string; onPress: () => void;
 }) {
   const width = progress.interpolate({ inputRange: [0, 1], outputRange: [36, 74], extrapolate: 'clamp' });
   const textOp = progress.interpolate({ inputRange: [0.5, 0.9], outputRange: [0, 1], extrapolate: 'clamp' });
   return (
     <PressBtn style={s.actionWrap} onPress={onPress} activeOpacity={0.85}>
       <Animated.View style={[s.actionPill, { width, backgroundColor: color }]}>
-        {iconNode ? iconNode(textColor) : <MaterialCommunityIcons name={icon as any} size={15} color={textColor} />}
+        {iconNode(textColor)}
         <Animated.Text style={[s.actionLabel, { opacity: textOp, color: textColor }]}>{label}</Animated.Text>
       </Animated.View>
     </PressBtn>
   );
+}
+
+// react-native-draggable-flatlist calls findNodeHandle, which react-native-web doesn't support
+// (it throws as soon as the list lays out). Web gets a plain list without drag-to-reorder; native
+// keeps the draggable one.
+const IS_WEB = Platform.OS === 'web';
+const ScrollContainer = IS_WEB ? ScrollView : NestableScrollContainer;
+
+function RowDecorator({ children }: { children: React.ReactNode }) {
+  return IS_WEB ? <>{children}</> : <ScaleDecorator activeScale={1}>{children}</ScaleDecorator>;
 }
 
 function ItemRow({ item, onEdit, drag, isActive }: {
@@ -51,7 +63,7 @@ function ItemRow({ item, onEdit, drag, isActive }: {
   const { removeItem } = useSplitStore();
   const swipeRef = useRef<Swipeable>(null);
   return (
-    <ScaleDecorator activeScale={1}>
+    <RowDecorator>
       <Swipeable
         ref={swipeRef}
         overshootRight={false}
@@ -89,13 +101,13 @@ function ItemRow({ item, onEdit, drag, isActive }: {
               <Text style={s.itemQty}>×{item.quantity}</Text>
               <Text style={s.itemPrice}>{fmt(item.price)}</Text>
             </View>
-            {!!item.modifiers?.length && (
-              <Text style={s.itemModifiers} numberOfLines={2}>{item.modifiers.join(', ')}</Text>
+            {itemDetailLabels(item).length > 0 && (
+              <Text style={s.itemModifiers} numberOfLines={2}>{itemDetailLabels(item).join(', ')}</Text>
             )}
           </PressBtn>
         </View>
       </Swipeable>
-    </ScaleDecorator>
+    </RowDecorator>
   );
 }
 
@@ -226,24 +238,33 @@ function InlineAddRow({ onAdd }: { onAdd: (name: string, price: number, qty: num
 
 // -- Item modal ----------------------------------------------------------------
 
+// Price fields edit the item's own price only; anything added to it (extras) is listed separately
+// below and its price is added back on save.
+const baseUnitPrice = (item: ItemData) =>
+  (item.price - extrasTotal(item)) / (item.quantity > 0 ? item.quantity : 1);
+
 function ItemModal({ visible, editItem, onClose }: { visible: boolean; editItem: ItemData | null; onClose: () => void }) {
-  const { addItemWithDetails, updateItem } = useSplitStore();
+  const { items, addItemWithDetails, updateItem, combineItems, separateExtra } = useSplitStore();
   const isEdit = !!editItem;
+  // Read the live item, not the snapshot it was opened with — separating an extra changes it.
+  const liveItem = editItem ? items.find((i) => i.id === editItem.id) ?? editItem : null;
+  const extras = liveItem?.extras ?? [];
+  const [combining, setCombining] = useState(false);
+  const combineTargets = editItem ? items.filter((i) => i.id !== editItem.id) : [];
   const [name, setName] = useState(editItem?.name ?? '');
   const [qty, setQty] = useState(editItem ? String(editItem.quantity || 1) : '1');
-  const [unitPrice, setUnitPrice] = useState(
-    editItem ? (editItem.quantity > 0 ? editItem.price / editItem.quantity : editItem.price).toFixed(2) : '',
-  );
+  const [unitPrice, setUnitPrice] = useState(editItem ? baseUnitPrice(editItem).toFixed(2) : '');
   const [focused, setFocused] = useState<string | null>(null);
 
   const prevKey = useRef<string | null>(null);
   const key = visible ? (editItem ? editItem.id : 'new') : null;
   if (visible && prevKey.current !== key) {
     prevKey.current = key;
+    setCombining(false);
     if (editItem) {
       setName(editItem.name);
       setQty(String(editItem.quantity || 1));
-      setUnitPrice((editItem.quantity > 0 ? editItem.price / editItem.quantity : editItem.price).toFixed(2));
+      setUnitPrice(baseUnitPrice(editItem).toFixed(2));
     } else { setName(''); setQty('1'); setUnitPrice(''); }
   } else if (!visible && prevKey.current !== null) {
     prevKey.current = null;
@@ -253,10 +274,11 @@ function ItemModal({ visible, editItem, onClose }: { visible: boolean; editItem:
   const parsedUnit = parseFloat(unitPrice) || 0;
   const total = parsedQty * parsedUnit;
 
+  // $0 is valid — receipts print free items (water, refills) that still need to be assignable.
   const submit = () => {
-    if (!name.trim() || parsedUnit <= 0) return;
+    if (!name.trim() || parsedUnit < 0) return;
     lightHaptic();
-    if (isEdit && editItem) updateItem(editItem.id, name.trim(), total, parsedQty);
+    if (isEdit && liveItem) updateItem(liveItem.id, name.trim(), total + extrasTotal(liveItem), parsedQty);
     else addItemWithDetails(name.trim(), total, parsedQty);
     onClose();
   };
@@ -296,10 +318,55 @@ function ItemModal({ visible, editItem, onClose }: { visible: boolean; editItem:
               size="small"
               label={isEdit ? 'Save' : 'Add'}
               onPress={submit}
-              disabled={!name.trim() || parsedUnit <= 0}
+              disabled={!name.trim() || parsedUnit < 0}
               style={{ flex: 1 }}
             />
           </View>
+          {extras.length > 0 && (
+            <View style={{ gap: 6 }}>
+              <Text style={s.modalLabel}>Added to this item</Text>
+              {extras.map((e) => (
+                <View key={e.id} style={s.combineRow}>
+                  <Text style={s.itemName} numberOfLines={1}>{e.quantity > 1 ? `${e.quantity}× ${e.name}` : e.name}</Text>
+                  <Text style={s.itemPrice}>+{fmt(e.price)}</Text>
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    label="Separate"
+                    onPress={() => { lightHaptic(); separateExtra(liveItem!.id, e.id); }}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
+          {isEdit && combineTargets.length > 0 && (
+            combining ? (
+              <View style={{ gap: 6 }}>
+                <Text style={s.modalLabel}>Add {editItem?.name} to…</Text>
+                <ScrollView style={{ maxHeight: 220 }} contentContainerStyle={{ gap: 6 }}>
+                  {combineTargets.map((t) => (
+                    <PressBtn
+                      key={t.id}
+                      style={s.combineRow}
+                      activeOpacity={0.6}
+                      noShadow
+                      onPress={() => { lightHaptic(); combineItems(editItem!.id, t.id); onClose(); }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.itemName} numberOfLines={1}>{t.name}</Text>
+                        {itemDetailLabels(t).length > 0 && (
+                          <Text style={s.itemModifiers} numberOfLines={2}>{itemDetailLabels(t).join(', ')}</Text>
+                        )}
+                      </View>
+                      <Text style={s.itemPrice}>{fmt(t.price)}</Text>
+                    </PressBtn>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : (
+              <Button variant="tertiary" size="small" label="Add to another item" onPress={() => { lightHaptic(); setCombining(true); }} />
+            )
+          )}
     </CenteredModal>
   );
 }
@@ -447,12 +514,14 @@ export default function ReviewScreen() {
           failure mode and fix). The plain scroll container already lifts the focused field on
           its own. */}
       <View style={{ flex: 1 }}>
-        <NestableScrollContainer style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+        <ScrollContainer style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
           {/* Line items */}
           <Text style={s.sectionLabel}>LINE ITEMS</Text>
           <View style={s.itemList}>
-            <NestableDraggableFlatList
+            {IS_WEB ? items.map((item) => (
+              <ItemRow key={item.id} item={item} onEdit={openEdit} drag={() => {}} isActive={false} />
+            )) : <NestableDraggableFlatList
               data={items}
               keyExtractor={(item) => item.id}
               onDragEnd={({ data }) => setItemOrder(data.map((i) => i.id))}
@@ -465,7 +534,7 @@ export default function ReviewScreen() {
               // long-press below). A low value made that gesture win the race against the parent
               // scroll view on every touch, which is exactly what was blocking normal scrolling.
               // The library's own default threshold is tuned to coexist with nested scrolling.
-            />
+            />}
           </View>
 
           {/* Tax, then any receipt-read charges/discounts, then Tip, then Add charge/discount last */}
@@ -557,7 +626,7 @@ export default function ReviewScreen() {
           </View>
 
           <View style={{ height: 8 }} />
-        </NestableScrollContainer>
+        </ScrollContainer>
 
         {error ? <Text style={s.errorText}>{error}</Text> : null}
 
@@ -640,8 +709,9 @@ const s = StyleSheet.create({
   emptyText: { color: C.textDim, textAlign: 'center', padding: 20, ...Type.cardDesc },
 
   // Item row — each row is its own rounded card so swipe actions aren't clipped
-  itemRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12, gap: 8, backgroundColor: C.card, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, marginBottom: 6 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 8, backgroundColor: C.card, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, marginBottom: 6 },
   itemRowDragging: { borderColor: C.yellow },
+  combineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: C.card, borderRadius: 12, borderWidth: 1.5, borderColor: C.border },
   itemName: { flex: 1, color: C.text, ...Type.bodySmall },
   itemQty: { color: C.textDim, ...Type.labelMedium },
   itemPrice: { color: C.text, ...Type.bodySmall, minWidth: 52, textAlign: 'right' },

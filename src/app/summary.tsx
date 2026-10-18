@@ -11,10 +11,10 @@ import { Button, Card, CenteredModal, CircleIconButton, Divider, Dropdown, Dropd
 import { CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, ReopenIcon, SendIcon } from '@/components/FigmaIcons';
 import { captureRef } from 'react-native-view-shot';
 import { BillHeader, FlowSteps } from '@/components/FlowSteps';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
+import { itemDetailLabels } from '@/utils/items';
 import { calculateSplits, fmt } from '@/utils/calculator';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { fmtDate } from '@/utils/date';
@@ -84,8 +84,8 @@ function ShareCardContent({ splits, total, restaurantName, date, mode, colorOffs
                     )}
                     <Text style={st.lineAmt}>{fmt(share)}</Text>
                   </View>
-                  {!!item.modifiers?.length && (
-                    <Text style={st.lineModifiers} numberOfLines={1}>{item.modifiers.join(', ')}</Text>
+                  {itemDetailLabels(item).length > 0 && (
+                    <Text style={st.lineModifiers} numberOfLines={1}>{itemDetailLabels(item).join(', ')}</Text>
                   )}
                 </View>
               ))}
@@ -363,8 +363,8 @@ function PersonDetailModal({ split, index, payer, paid, isPayer, onClose, onMark
               )}
               <Text style={st.lineAmt}>{fmt(share)}</Text>
             </View>
-            {!!item.modifiers?.length && (
-              <Text style={st.lineModifiers} numberOfLines={1}>{item.modifiers.join(', ')}</Text>
+            {itemDetailLabels(item).length > 0 && (
+              <Text style={st.lineModifiers} numberOfLines={1}>{itemDetailLabels(item).join(', ')}</Text>
             )}
           </View>
         ))}

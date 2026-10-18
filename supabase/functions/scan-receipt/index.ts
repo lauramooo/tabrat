@@ -36,6 +36,7 @@ Rules:
     1 Salad                   9.00
   becomes exactly this "items" array (two items, not four):
     [{"name": "Burger", "price": 14.00, "quantity": 1, "modifiers": ["with fries", "add bacon"]}, {"name": "Salad", "price": 9.00, "quantity": 1}]
+- Prices: each price belongs to the item on its own printed line. Many receipts print items with no price at all (water, free refills, an included side) — those items are $0. Never move a price from a neighboring line onto an item that has none; if you are unsure which line a price sits on, compare its vertical position to the item names closely before deciding.
 - quantity: number of units for that item (e.g. 2 for "2x Burger"). Default 1 if not shown.
 - price: the TOTAL price for that line, including any merged modifier price (quantity × unit price + modifiers). Read each digit carefully.
 - extraCharges: any named charge on the receipt that is NOT tax and NOT tip — service charge, delivery fee, credit card surcharge, bag fee, etc. — as its own entry with its printed name and amount. Discounts/coupons also go here with isDiscount:true and a positive amount (the amount that gets subtracted). Never fold these into subtotal, tax, or items — list every one so nothing printed on the receipt goes untracked. Empty array if there are none.

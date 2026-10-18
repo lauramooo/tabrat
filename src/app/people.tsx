@@ -171,7 +171,7 @@ export default function PeopleScreen() {
               {filteredGroups.map((g) => (
                 <DropdownRow
                   key={g.id}
-                  icon={<Text style={{ fontSize: 14, width: 16, textAlign: 'center' }}>{g.icon}</Text>}
+                  icon={<UserMultipleIcon size={15} color={C.textSub} />}
                   onPress={() => handleAddGroup(g)}
                 >
                   <Text style={styles.dropName}>{g.name}</Text>
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   chipsSection: { gap: 10 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
-  dropName: { flex: 1, ...Type.labelMedium, color: C.text },
+  dropName: { ...Type.labelMedium, color: C.text },
   dropSub: { ...Type.cardDesc, color: C.textDim },
 
   errorText: { color: C.error, ...Type.cardDesc },

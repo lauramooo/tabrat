@@ -1,5 +1,5 @@
 import { PressBtn } from '@/components/PressBtn';
-import { CalendarIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, MoneyIcon, PlusCircleIcon, TripTypeIcon, UserIcon } from '@/components/FigmaIcons';
+import { ChevronDownCircleIcon, ChevronUpCircleIcon, MoneyIcon, PlusCircleIcon, TripTypeIcon, UserIcon, UserMultipleIcon } from '@/components/FigmaIcons';
 import { Stack, useRouter } from 'expo-router';
 import { ScreenHeaderTitle } from '@/components/FlowSteps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
-import { Button, Card, CurrencyPickerList, DateRangeCalendarModal, Divider, Dropdown, DropdownRow, FieldLabel, Input, SearchInput } from '@/components/design';
+import { Button, Card, CurrencyPickerList, DateRangeField, Divider, Dropdown, DropdownRow, FieldLabel, Input, SearchInput } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { CURRENCIES } from '@/constants/currencies';
@@ -18,7 +18,6 @@ import { PersonChip } from '@/components/PersonChip';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { sanitizeNumberInput } from '@/utils/calculator';
-import { fmtDateRange } from '@/utils/date';
 import { sortWithMeFirst } from '@/utils/sortPeople';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 
@@ -54,7 +53,6 @@ export default function NewTripScreen() {
     load();
   }, []);
   const [error, setError] = useState<string | null>(null);
-  const [dateModalOpen, setDateModalOpen] = useState(false);
 
   const addPerson = (n?: string) => {
     const trimmed = (n ?? friendSearch).trim();
@@ -139,23 +137,11 @@ export default function NewTripScreen() {
 
         {/* -- Dates -- */}
         <FieldLabel>DATES</FieldLabel>
-        <PressBtn style={s.dateBtn} onPress={() => setDateModalOpen(true)} activeOpacity={0.7}>
-          <CalendarIcon size={15} color={C.text} />
-          <Text style={{ color: startDate ? C.text : C.textDim, flex: 1, ...Type.bodySmall }} numberOfLines={1}>
-            {startDate ? fmtDateRange(startDate, endDate) : 'Choose date(s)'}
-          </Text>
-          {startDate ? (
-            <PressBtn onPress={() => { setStartDate(''); setEndDate(''); }} hitSlop={8}>
-              <CloseCircleIcon size={15} color={C.textDim} />
-            </PressBtn>
-          ) : null}
-        </PressBtn>
-        <DateRangeCalendarModal
-          visible={dateModalOpen}
+        <DateRangeField
           startDate={startDate}
           endDate={endDate}
-          onConfirm={(s, e) => { setStartDate(s); setEndDate(e); setDateModalOpen(false); }}
-          onClose={() => setDateModalOpen(false)}
+          onChange={(st, en) => { setStartDate(st); setEndDate(en); }}
+          style={{ marginBottom: 20 }}
         />
 
         {/* -- Rats -- */}
@@ -215,7 +201,7 @@ export default function NewTripScreen() {
             {filteredGroups.map((g) => (
               <DropdownRow
                 key={g.id}
-                icon={<Text style={{ fontSize: 14, width: 16, textAlign: 'center' }}>{g.icon}</Text>}
+                icon={<UserMultipleIcon size={15} color={C.textSub} />}
                 onPress={() => addGroupMembers(g.id)}
               >
                 <Text style={s.friendDropName}>{g.name}</Text>
@@ -319,7 +305,6 @@ const s = StyleSheet.create({
 
   input: { marginBottom: 16 },
 
-  dateBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.card, borderRadius: InputMetrics.radius, height: InputMetrics.height, paddingHorizontal: 14, marginBottom: 20 },
 
   editDateRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: InputMetrics.height },
   editDateText: { flex: 1, minWidth: 0, ...Type.bodySmall, color: C.text },
@@ -329,7 +314,7 @@ const s = StyleSheet.create({
 
   peopleChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
 
-  friendDropName: { flex: 1, ...Type.labelMedium, color: C.text },
+  friendDropName: { ...Type.labelMedium, color: C.text },
   friendDropSub: { ...Type.cardDesc, color: C.textDim },
 
   errorText: { color: C.error, ...Type.cardDesc, marginTop: 8 },

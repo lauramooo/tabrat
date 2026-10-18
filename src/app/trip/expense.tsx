@@ -1,4 +1,3 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressBtn } from '@/components/PressBtn';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -6,7 +5,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { CircleIconButton, IconBadge } from '@/components/design';
-import { PencilIcon, ReceiptIcon } from '@/components/FigmaIcons';
+import { CameraIcon, PencilIcon, ReceiptIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
@@ -84,7 +83,7 @@ export default function ExpenseScreen() {
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={s.content}>
         <OptionCard
-          icon="camera-outline"
+          iconNode={<CameraIcon color={C.primary} size={22} />}
           title="Upload receipt"
           desc="Scan or upload a photo to auto-fill items"
           onPress={handleUploadReceipt}
@@ -101,14 +100,14 @@ export default function ExpenseScreen() {
 }
 
 function OptionCard({
-  icon, iconNode, title, desc, onPress,
+  iconNode, title, desc, onPress,
 }: {
-  icon?: string; iconNode?: React.ReactNode; title: string; desc: string; onPress: () => void;
+  iconNode: React.ReactNode; title: string; desc: string; onPress: () => void;
 }) {
   return (
     <PressBtn style={s.optionCard} onPress={onPress} activeOpacity={0.8}>
       <IconBadge size={48} bg={C.primaryDim}>
-        {iconNode ?? <MaterialCommunityIcons name={icon as any} size={26} color={C.primary} />}
+        {iconNode}
       </IconBadge>
       <View style={{ flex: 1 }}>
         <Text style={s.optionTitle}>{title}</Text>

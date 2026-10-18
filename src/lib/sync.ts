@@ -76,11 +76,14 @@ export function syncUpsertSplitRecord(r: SplitRecord) {
     id: r.id, user_id, date: r.date, restaurant_name: r.restaurantName, receipt_date: r.receiptDate,
     total: r.total, people: r.people, item_count: r.itemCount, items: r.items ?? null,
     full_people: r.fullPeople ?? null, extra_charges: r.extraCharges ?? null, tax: r.tax, tip: r.tip,
-    image_uri: r.imageUri, paid_by_id: r.paidById, paid_by_name: r.paidByName,
+    // A web data: URI is the whole photo (hundreds of KB) — kept locally only, not in this row.
+    image_uri: r.imageUri?.startsWith('data:') ? null : r.imageUri, paid_by_id: r.paidById, paid_by_name: r.paidByName,
     trip_id: r.tripId, home_id: r.homeId, person_amounts: r.personAmounts ?? null,
     expense_category: r.expenseCategory, status: r.status, currency: r.currency,
     payers: r.payers ?? null, payment_statuses: r.paymentStatuses ?? null, source: r.source,
     join_code: r.joinCode,
+    // Only sent once set, so rows without a range don't depend on migration 0009's column.
+    ...(r.receiptEndDate !== undefined && { receipt_end_date: r.receiptEndDate }),
   }));
 }
 export function syncDeleteSplitRecord(id: string) {

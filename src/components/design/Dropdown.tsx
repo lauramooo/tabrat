@@ -1,4 +1,4 @@
-import { Modal, Pressable, ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
 import { C } from '@/constants/colors';
 
 export type DropdownPosition = { top?: number; bottom?: number; left?: number; right?: number; width?: number; minWidth?: number };
@@ -33,7 +33,13 @@ export function Dropdown({
 
   if (mode === 'inline') {
     return (
-      <View style={[styles.card, styles.inlineCard, { top: position.top, maxHeight }, style]}>
+      // On web, a mousedown on a row blurs the anchor input, and callers close the dropdown on
+      // blur — so a normal-length click unmounted the row before its click landed. Keeping focus
+      // on the input (as keyboardShouldPersistTaps does on native) lets the row's press go through.
+      <View
+        style={[styles.card, styles.inlineCard, { top: position.top, maxHeight }, style]}
+        {...(Platform.OS === 'web' ? { onMouseDown: (e: { preventDefault: () => void }) => e.preventDefault() } : {})}
+      >
         {content}
       </View>
     );

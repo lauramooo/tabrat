@@ -1,10 +1,9 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { PressBtn } from '@/components/PressBtn';
-import { CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, ExpenseIcon, MoreIcon, PencilIcon, PlusCircleIcon, ReopenIcon, SendIcon, SortIcon, TrashIcon } from '@/components/FigmaIcons';
+import { CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, MoreIcon, PencilIcon, PlusCircleIcon, PlusIcon, ReopenIcon, SendIcon, SortIcon, TrashIcon } from '@/components/FigmaIcons';
 import { ShareCodeModal } from '@/components/ShareCodeModal';
-import { ScreenHeaderTitle, ScreenSubHeader } from '@/components/FlowSteps';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { createElement, useEffect, useMemo, useRef, useState } from 'react';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet,
   TextInput, View,
@@ -14,7 +13,11 @@ import Svg, { G, Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { Avatar } from '@/components/Avatar';
-import { Button, Card, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, DatePickerModal, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, Input, PayModal, RunningTotalsCard, SectionLabel, SettlementRow } from '@/components/design';
+import { GroupHeader, HeaderMonthPicker } from '@/components/GroupHeader';
+import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
+import { takeGroupEditRequest } from '@/utils/pendingGroupEdit';
+import { QuickAddBar } from '@/components/QuickAddBar';
+import { Button, Card, EmptyHint, EmptyPie, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, DatePickerModal, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, Input, PayModal, RunningTotalsCard, SectionLabel, SettlementRow } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
@@ -23,7 +26,7 @@ import { useSplitStore } from '@/store/useSplitStore';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { calculateTripSettlement, fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator';
 import { getCategoryData } from '@/utils/categoryColors';
-import { fmtDate } from '@/utils/date';
+import { fmtDate, parseLocalDate } from '@/utils/date';
 import { mediumHaptic, selectionHaptic, lightHaptic } from '@/utils/haptics';
 import { layoutPieSegments, roundedSegmentPath } from '@/utils/pieLayout';
 
@@ -60,7 +63,7 @@ function fromISO(d: string): string {
 }
 function parseDateDisplay(d: string): Date {
   const iso = toISO(d);
-  const dt = iso ? new Date(iso + 'T00:00:00') : new Date(d);
+  const dt = iso ? new Date(iso + 'T00:00:00') : parseLocalDate(d);
   return isNaN(dt.getTime()) ? new Date() : dt;
 }
 function isoToDisplay(isoStr: string): string {
@@ -91,6 +94,8 @@ function PieDonut({ data, centerText, currency }: {
 }) {
   const [tooltip, setTooltip] = useState<{ label: string; value: number; textColor: string } | null>(null);
   const wasLongPress = useRef(false);
+  const toggleTooltip = (d: { label: string; value: number; textColor: string }) =>
+    setTooltip((prev) => (prev?.label === d.label ? null : { label: d.label, value: d.value, textColor: d.textColor }));
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0 || data.length === 0) return null;
   const radius = (PIE_SIZE - PIE_RING) / 2;
@@ -117,22 +122,25 @@ function PieDonut({ data, centerText, currency }: {
                 key={d.label}
                 d={roundedSegmentPath(center, center, innerR, outerR, startAngle, endAngle, PIE_CORNER)}
                 fill={d.color}
-                onPressIn={() => { wasLongPress.current = false; }}
-                onPress={() => {
-                  lightHaptic();
-                  setTooltip((prev) => (prev?.label === d.label ? null : { label: d.label, value: d.value, textColor: d.textColor }));
-                }}
-                onLongPress={() => { wasLongPress.current = true; lightHaptic(); setTooltip({ label: d.label, value: d.value, textColor: d.textColor }); }}
-                {...(Platform.OS !== 'web' ? { onPressOut: () => { if (wasLongPress.current) { setTooltip(null); wasLongPress.current = false; } } } : null)}
+                // react-native-svg's web shapes are plain DOM elements: RN press/responder props
+                // aren't valid on them (each logs "Unknown event handler property" and never
+                // fires), so web gets a DOM click that toggles the tooltip instead. onPress must
+                // be an explicit null there — the web shim otherwise overwrites onClick with it.
+                {...(Platform.OS === 'web' ? {
+                  onPress: null as any,
+                  onClick: () => toggleTooltip(d),
+                } : {
+                  onPressIn: () => { wasLongPress.current = false; },
+                  onPress: () => { lightHaptic(); toggleTooltip(d); },
+                  onLongPress: () => { wasLongPress.current = true; lightHaptic(); setTooltip({ label: d.label, value: d.value, textColor: d.textColor }); },
+                  onPressOut: () => { if (wasLongPress.current) { setTooltip(null); wasLongPress.current = false; } },
+                })}
               />
             );
           })}
         </G>
       </Svg>
-      <View style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        justifyContent: 'center', alignItems: 'center', pointerEvents: 'none',
-      }}>
+      <View style={s.pieCenterOverlay}>
         {tooltip ? (
           <View style={s.pieTooltip}>
             <Text style={[s.pieTooltipAmt, { color: tooltip.textColor }]}>{fmt(tooltip.value, currency)}</Text>
@@ -435,11 +443,12 @@ export default function HomeDetailScreen() {
   // The actions menu renders in a full-screen Modal, ignoring the header's own layout — position
   // it using the safe-area inset plus the standard native header content height so it lands just
   // under the header button regardless of device, matching BillHeader's actions menu.
-  const actionsTop = insets.top + (Platform.OS === 'ios' ? 44 : 56) + 6;
-  const { homes, history, homePayments, deleteHome, closeHome, reopenHome, updateHome, addHomePayment, removeHomePaymentsFor } = useSplitStore();
+  const { homes, history, homePayments, deleteHome, closeHome, reopenHome, updateHome, addHomePayment, removeHomePaymentsFor, saveHomeExpenseDirectly } = useSplitStore();
 
   const home = homes.find((h) => h.id === id);
   const [actionsModal, setActionsModal] = useState(false);
+  // Edit picked from the Expenses tab's ⋮ menu lands back here with the edit form open.
+  useFocusEffect(useCallback(() => { if (takeGroupEditRequest(id!)) setEditVisible(true); }, [id]));
   const [shareModal, setShareModal] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -573,38 +582,15 @@ export default function HomeDetailScreen() {
         headerLeft: () => (
           <CircleIconButton variant="back" size={28} color={C.primary} onPress={() => router.back()} style={{ paddingHorizontal: 12 }} />
         ),
-        headerRight: () => (
-          <PressBtn onPress={() => setActionsModal(true)} activeOpacity={0.5} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
-            <MoreIcon color={C.text} size={20} />
-          </PressBtn>
-        ),
+        headerRight: () => <GroupActionsButton onPress={() => setActionsModal(true)} />,
       }} />
-      <ScreenSubHeader>
-        <ScreenHeaderTitle name={home.name} reserveDateSlot={false}>
-          <View style={s.hdrMonthNavRow}>
-            <CircleIconButton variant="back" size={20} color={C.primary} onPress={prevMonth} hitSlop={10} />
-            <Text style={s.monthLabel}>{MONTH_NAMES[viewMonth]} {viewYear}</Text>
-            <CircleIconButton variant="back" size={20} color={isCurrentMonth ? C.textDim : C.primary} onPress={nextMonth}
-              disabled={isCurrentMonth} hitSlop={10} style={{ transform: [{ rotate: '180deg' }] }} />
-          </View>
-        </ScreenHeaderTitle>
-      </ScreenSubHeader>
-
-      {/* Member bubbles strip */}
-      {homePeople.length > 0 && (
-        <View style={s.friendStrip}>
-          {homePeople.slice(0, 8).map((name, i) => (
-            <Avatar
-              key={name}
-              name={name}
-              index={i}
-              size={18}
-              fontSize={8}
-              style={[s.hdrAvatar, { marginLeft: i === 0 ? 0 : -5, zIndex: 10 - i }]}
-            />
-          ))}
-        </View>
-      )}
+      <GroupHeader
+        name={home.name}
+        subtitle={<HeaderMonthPicker label={`${MONTH_NAMES[viewMonth]} ${viewYear}`} onPrev={prevMonth} onNext={nextMonth} nextDisabled={isCurrentMonth} />}
+        people={homePeople}
+        active="dashboard"
+        onSelectTab={() => { selectionHaptic(); router.push({ pathname: '/home/expenses' as any, params: { homeId: id! } }); }}
+      />
 
       {/* ── Total + person scope dropdown (fixed, above scroll) ── */}
         <View style={s.totalBar}>
@@ -682,6 +668,19 @@ export default function HomeDetailScreen() {
               </View>
             )}
 
+            {/* Empty month: each section's heading with a hint of what will show up there */}
+            {monthExpenses.length === 0 && (
+              <View style={[s.section, { paddingTop: 4 }]}>
+                <EmptyPie size={PIE_SIZE} ring={PIE_RING} centerText={`${getCurrencySymbol('USD')}0`} text="Add expenses to see where the money goes." />
+              </View>
+            )}
+            {monthExpenses.length === 0 && visibleSettlement.length === 0 && (
+              <View style={s.section}>
+                <SectionLabel style={{ marginBottom: 8 }}>WHO OWES WHO</SectionLabel>
+                <EmptyHint text="Nothing here yet" />
+              </View>
+            )}
+
             {/* WHO OWES WHO */}
             {visibleSettlement.length > 0 && (
               <View style={s.section}>
@@ -751,8 +750,16 @@ export default function HomeDetailScreen() {
                 </Card>
               </View>
             )}
-            {monthExpenses.length > 0 && visibleSettlement.length === 0 && personTotals.length > 0 && (
+            {/* Only when an expense really has no payer — a one-person trip (or everyone even) has no debts either. */}
+            {monthExpenses.length > 0 && visibleSettlement.length === 0 && monthExpenses.some((t) => !t.paidByName && !t.paidById) && (
               <Text style={s.noSettlementNote}>Set a payer on each expense to see who owes who.</Text>
+            )}
+
+            {personTotals.length === 0 && (
+              <View style={s.section}>
+                <SectionLabel style={{ marginBottom: 8 }}>RUNNING TOTALS</SectionLabel>
+                <EmptyHint text="Nothing here yet" />
+              </View>
             )}
 
             {/* Running totals per person */}
@@ -779,26 +786,29 @@ export default function HomeDetailScreen() {
               </View>
             )}
 
-            {monthExpenses.length === 0 && (
-              <View style={s.emptySection}>
-                <Text style={s.emptySectionText}>No expenses in {MONTH_NAMES[viewMonth]} — add the first one below.</Text>
-              </View>
-            )}
         </>
 
         <View style={{ height: 8 }} />
       </ScrollView>
 
-      {/* Footer */}
-      <View style={s.footer}>
-        <Button
-          variant="primary"
-          size="big"
-          label="Expenses"
-          icon={<ExpenseIcon color={C.text} size={18} />}
-          onPress={() => { selectionHaptic(); router.push({ pathname: '/home/expenses' as any, params: { homeId: id! } }); }}
-        />
-      </View>
+      <QuickAddBar
+        people={homePeople}
+        myName={myName}
+        currency="USD"
+        onSave={({ name, amount, payer }) => saveHomeExpenseDirectly({
+          name,
+          receiptDate: fmtDate(new Date()),
+          category: null,
+          amount,
+          participants: home.members,
+          paidByName: payer,
+          homeId: home.id,
+        })}
+        addLabel="Add expense"
+        // Adding lives on the Expenses tab, so this opens it with the add sheet up.
+        onAdd={() => { selectionHaptic(); router.push({ pathname: '/home/expenses' as any, params: { homeId: id!, openAdd: 'true' } }); }}
+        footerStyle={s.footer}
+      />
 
       {payModal && (
         <PayModal
@@ -828,35 +838,17 @@ export default function HomeDetailScreen() {
       )}
 
       {/* Actions modal */}
-      <Modal visible={actionsModal} transparent animationType="none" onRequestClose={() => setActionsModal(false)}>
-        <Pressable style={s.actionsBackdrop} onPress={() => setActionsModal(false)}>
-          <View style={[s.actionsCard, { top: actionsTop }]}>
-            <PressBtn style={s.actionsRow} onPress={() => { setActionsModal(false); setEditVisible(true); }} activeOpacity={0.6}>
-              <PencilIcon color={C.textSub} size={17} />
-              <Text style={s.actionsRowText}>Edit</Text>
-            </PressBtn>
-            <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); setShareModal(true); }} activeOpacity={0.6}>
-              <SendIcon color={C.textSub} size={17} />
-              <Text style={s.actionsRowText}>Share</Text>
-            </PressBtn>
-            {home.status !== 'closed' ? (
-              <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); closeHome(home.id); }} activeOpacity={0.6}>
-                <CheckCircleIcon color={C.textSub} size={17} />
-                <Text style={s.actionsRowText}>Close home</Text>
-              </PressBtn>
-            ) : (
-              <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); reopenHome(home.id); }} activeOpacity={0.6}>
-                <ReopenIcon size={17} color={C.textSub} />
-                <Text style={s.actionsRowText}>Reopen</Text>
-              </PressBtn>
-            )}
-            <PressBtn style={[s.actionsRow, s.actionsRowDivider]} onPress={() => { setActionsModal(false); setDeleteConfirm(true); }} activeOpacity={0.6}>
-              <TrashIcon color={C.error} size={17} />
-              <Text style={[s.actionsRowText, { color: C.error }]}>Delete</Text>
-            </PressBtn>
-          </View>
-        </Pressable>
-      </Modal>
+      <GroupActionsMenu
+        visible={actionsModal}
+        onDismiss={() => setActionsModal(false)}
+        closeLabel="Close home"
+        closed={home.status === 'closed'}
+        onEdit={() => setEditVisible(true)}
+        onShare={() => setShareModal(true)}
+        onCloseGroup={() => closeHome(home.id)}
+        onReopen={() => reopenHome(home.id)}
+        onDelete={() => setDeleteConfirm(true)}
+      />
 
       <ShareCodeModal
         visible={shareModal}
@@ -899,13 +891,9 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   // Header (matches trip/[id].tsx)
-  hdrMonthNavRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -2 },
-  friendStrip: { flexDirection: 'row', justifyContent: 'center', paddingTop: 4, paddingBottom: 4 },
-  hdrAvatar: { width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: C.bg },
 
   scrollContent: { paddingBottom: 24 },
 
-  monthLabel: { ...Type.cardDesc, color: C.textSub },
 
   // Total + person scope dropdown (identical to trip/[id].tsx)
   totalBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
@@ -916,8 +904,6 @@ const s = StyleSheet.create({
   scopeDropItemText: { ...Type.labelMedium, color: C.text },
 
   section: { paddingHorizontal: 16, paddingTop: 16 },
-  emptySection: { alignItems: 'center', paddingVertical: 40 },
-  emptySectionText: { ...Type.cardDesc, color: C.textDim, textAlign: 'center' },
 
   // Pie chart
   pieSection: { padding: 12 },
@@ -928,17 +914,20 @@ const s = StyleSheet.create({
   legendLabel: { flex: 1, fontFamily: 'Poppins_500Medium', fontSize: 11, color: C.text },
   legendAmt: { ...Type.cardTitle, color: C.text, width: 62 },
   pieCenterText: { fontFamily: 'Poppins_900Black', fontSize: 12, color: C.text, textAlign: 'center' },
+  // pointerEvents must live in a StyleSheet: react-native-web drops it from an inline style object,
+  // and this overlay then swallowed every tap meant for the pie slices underneath.
+  pieCenterOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', pointerEvents: 'none' },
   pieTooltip: { alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, boxShadow: '0px 3px 8px rgba(0,0,0,0.15)', elevation: 5 },
   pieTooltipAmt: { fontFamily: 'Poppins_900Black', fontSize: 13 },
   pieTooltipLabel: { fontFamily: 'Poppins_500Medium', fontSize: 10, color: C.textSub, maxWidth: 80 },
-  noDataNote: { ...Type.cardDesc, color: C.textDim, textAlign: 'center', paddingVertical: 16 },
+  noDataNote: { ...Type.note, color: C.textDim, textAlign: 'center', paddingVertical: 16 },
 
   // Settlement cards (matches trip/[id].tsx)
   settleCard: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, gap: 8 },
   settleOwes: { fontFamily: 'Poppins_500Medium', fontSize: 12, color: C.text },
 
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  noSettlementNote: { ...Type.cardDesc, color: C.textDim, textAlign: 'center', marginTop: 12, marginHorizontal: 16, fontStyle: 'italic' },
+  noSettlementNote: { ...Type.note, color: C.textDim, textAlign: 'center', marginTop: 12, marginHorizontal: 16 },
 
   footer: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.border },
 
@@ -956,9 +945,4 @@ const s = StyleSheet.create({
   editInput: { ...Type.labelMedium },
 
   // Actions modal (matches trip/[id].tsx)
-  actionsBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
-  actionsCard: { position: 'absolute', right: 10, backgroundColor: C.bg, borderRadius: 14, width: 210, overflow: 'hidden' },
-  actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
-  actionsRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border },
-  actionsRowText: { ...Type.bodySmall, color: C.text },
 });

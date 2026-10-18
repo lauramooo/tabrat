@@ -1,110 +1,27 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { PressBtn } from '@/components/PressBtn';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ActionSheetIOS, Alert, Platform } from 'react-native';
-import { createElement, useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { ActionSheetIOS, Alert, Platform, Pressable } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Image,
   ScrollView, StyleSheet, TextInput, View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
-import { Button, Card, CenteredModal, CircleIconButton, DatePickerModal, Dropdown, DropdownRow, FieldLabel, Input } from '@/components/design';
-import { CalendarIcon, CameraIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, PencilIcon, PlusCircleIcon, SearchIcon, SortIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
+import { Button, Card, CenteredModal, CircleIconButton, DateRangeField, Dropdown, DropdownRow, FieldLabel, Input } from '@/components/design';
+import { CameraIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, PencilIcon, PlusCircleIcon, SearchIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
-import { InputMetrics } from '@/constants/spacing';
+import { InputMetrics, Radius } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator';
-import { fmtDate } from '@/utils/date';
+import { fmtDate, parseLocalDate } from '@/utils/date';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import { applyTextShortcuts } from '@/utils/text';
-
-// -- Date helpers --------------------------------------------------------------
-
-function toISO(d: string): string {
-  const m = d.match(/^(\w+)\s+(\d+),\s*(\d+)$/);
-  if (!m) return '';
-  const months: Record<string, string> = {
-    Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
-    Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12',
-  };
-  return `${m[3]}-${months[m[1]] ?? '01'}-${m[2].padStart(2, '0')}`;
-}
-function fromISO(d: string): string {
-  if (!d) return '';
-  const [y, mo, day] = d.split('-');
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[parseInt(mo, 10) - 1]} ${parseInt(day, 10)}, ${y}`;
-}
-function parseDisplay(d: string): Date {
-  const iso = toISO(d);
-  const dt = iso ? new Date(iso + 'T00:00:00') : new Date(d);
-  return isNaN(dt.getTime()) ? new Date() : dt;
-}
-
-// -- Date picker row -----------------------------------------------------------
-
-function DateRow({ value, onChange, placeholder }: {
-  value: string; onChange: (v: string) => void; placeholder: string;
-}) {
-  const [showNative, setShowNative] = useState(false);
-  const [iosDate, setIosDate] = useState(new Date());
-  const handlePress = () => {
-    setIosDate(value ? parseDisplay(value) : new Date());
-    setShowNative(true);
-  };
-
-  const onNativeChange = (_: any, date?: Date) => {
-    if (Platform.OS !== 'android') return;
-    setShowNative(false);
-    if (date) onChange(fmtDate(date));
-  };
-
-  return (
-    <>
-      {Platform.OS === 'web' ? (
-        <View style={[s.detailRow, { position: 'relative' }]}>
-          <CalendarIcon size={15} color={C.text} />
-          <Text style={[s.detailText, !value && { color: C.textDim }]}>{value || placeholder}</Text>
-          {createElement('input', {
-            type: 'date',
-            value: toISO(value),
-            onChange: (e: any) => { const v = e.target.value; if (v) onChange(fromISO(v)); },
-            style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0, cursor: 'pointer', border: 'none', outline: 'none' } as any,
-          })}
-        </View>
-      ) : (
-        <PressBtn style={s.detailRow} onPress={handlePress} activeOpacity={0.8}>
-          <CalendarIcon size={15} color={C.text} />
-          <Text style={[s.detailText, !value && { color: C.textDim }]}>{value || placeholder}</Text>
-          {value ? (
-            <PressBtn onPress={() => onChange('')} hitSlop={8}>
-              <CloseCircleIcon size={15} color={C.textDim} />
-            </PressBtn>
-          ) : null}
-        </PressBtn>
-      )}
-      {showNative && Platform.OS === 'android' && (
-        <DateTimePicker value={iosDate} mode="date" display="calendar" onChange={onNativeChange} />
-      )}
-      {Platform.OS === 'ios' && (
-        <DatePickerModal
-          visible={showNative}
-          value={iosDate}
-          onChange={(d) => onChange(fmtDate(d))}
-          onClose={() => setShowNative(false)}
-          title={placeholder}
-        />
-      )}
-    </>
-  );
-}
 
 // -- Category rename modal -----------------------------------------------------
 
@@ -209,6 +126,7 @@ export default function ManualEntryScreen() {
     if (!record) return;
     setExpenseName(record.restaurantName ?? '');
     setStartDate(record.receiptDate ?? today);
+    setEndDate(record.receiptEndDate ?? '');
     setCategory(record.expenseCategory ?? null);
     setAmountText(record.total > 0 ? String(record.total) : '');
     setParticipants(record.people);
@@ -254,8 +172,8 @@ export default function ManualEntryScreen() {
   // Per-day / per-person calculation
   const dayCount = (() => {
     if (!endDate) return 0;
-    const st = parseDisplay(startDate);
-    const en = parseDisplay(endDate);
+    const st = parseLocalDate(startDate);
+    const en = parseLocalDate(endDate);
     if (isNaN(st.getTime()) || isNaN(en.getTime())) return 0;
     const diff = Math.round((en.getTime() - st.getTime()) / 86400000) + 1;
     return diff > 1 ? diff : 0;
@@ -288,7 +206,13 @@ export default function ManualEntryScreen() {
   // pushed this screen (the expenses list, a specific expense, trip detail's quick-add) — the
   // desired behavior here is "leaving this screen always returns to the trip," not "retrace my
   // steps." replace (not push) so it doesn't grow the stack every time this screen is used.
-  const goBack = () => router.replace({ pathname: '/trip/[id]', params: { id: tripId! } } as any);
+  // Every entry point pushes this screen, so pop back to wherever it was opened from (the trip's
+  // Dashboard or Expenses tab) — a replace slid a new copy of the dashboard in like a forward
+  // navigation. The replace is only a fallback if there's no history (e.g. a cold deep link).
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace({ pathname: '/trip/[id]', params: { id: tripId! } } as any);
+  };
 
   const handleSave = () => {
     if (!expenseName.trim()) { setError('Enter an expense name.'); return; }
@@ -300,6 +224,7 @@ export default function ManualEntryScreen() {
     saveTripExpenseDirectly({
       name: expenseName.trim(),
       receiptDate: startDate,
+      receiptEndDate: endDate || undefined,
       category,
       rawItems: [{ name: expenseName.trim(), price: amount, quantity: 1 }],
       participants,
@@ -312,24 +237,24 @@ export default function ManualEntryScreen() {
   };
 
   return (
-    <SafeAreaView style={s.safe} edges={['bottom']}>
-      <Stack.Screen options={{
-        title: expenseId ? (expenseName || 'Expense') : 'Add expense',
-        headerTransparent: false,
-        headerStyle: { backgroundColor: C.bg },
-        headerLeft: () => (
-          <CircleIconButton variant="back" size={28} color={C.primary} onPress={goBack} style={{ paddingHorizontal: 12 }} />
-        ),
-      }} />
+    // A centered pop-up (same look as CenteredModal) rather than a full page: this route is a
+    // transparentModal, so the trip stays visible behind the backdrop. Tapping the backdrop closes it.
+    <View style={s.backdrop}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={goBack} />
+      <View style={s.card}>
+      <View style={s.cardHeader}>
+        <Text style={s.cardTitle} numberOfLines={1}>{expenseId ? (expenseName || 'Expense') : 'Add expense'}</Text>
+        <CircleIconButton variant="close" size={22} color={C.text} onPress={goBack} />
+      </View>
 
       {/* No KeyboardAvoidingView here — it was fighting the ScrollView's own native "scroll the
           focused field into view" behavior on iOS, and the combination could collapse the whole
           scroll area to almost nothing when the keyboard opened (the same failure mode found and
           fixed the same way in AuthGate.tsx earlier). The plain ScrollView already lifts whatever
           field is focused just above the keyboard on its own. */}
-      <View style={{ flex: 1 }}>
-        <View style={{ flex: 1, position: 'relative' }}>
-        <ScrollView style={s.scroll} contentContainerStyle={s.content}
+      <View style={{ flexShrink: 1 }}>
+        <View style={{ flexShrink: 1, position: 'relative' }}>
+        <ScrollView style={s.scroll} contentContainerStyle={s.content} automaticallyAdjustKeyboardInsets
           keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
           {/* -- Name -- */}
@@ -436,17 +361,12 @@ export default function ManualEntryScreen() {
           </Dropdown>
 
           <FieldLabel style={{ marginTop: 20 }}>DATES</FieldLabel>
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            <Card padding={0} row={false} radius={10} style={{ flex: 1 }}>
-              <DateRow value={startDate} onChange={setStartDate} placeholder="Start date" />
-            </Card>
-            <View style={{ transform: [{ rotate: '90deg' }] }}>
-              <SortIcon size={13} color={C.textDim} />
-            </View>
-            <Card padding={0} row={false} radius={10} style={{ flex: 1 }}>
-              <DateRow value={endDate} onChange={setEndDate} placeholder="End (optional)" />
-            </Card>
-          </View>
+          <DateRangeField
+            startDate={startDate}
+            endDate={endDate}
+            onChange={(st, en) => { setStartDate(st); setEndDate(en); }}
+            clearable={false}
+          />
 
           {/* Per-day/person breakdown */}
           {dayCount > 0 && amount > 0 && (
@@ -612,14 +532,18 @@ export default function ManualEntryScreen() {
           )}
         </ScrollView>
       </Dropdown>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bg },
-  scroll: { flex: 1 },
-  content: { padding: 16 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  card: { backgroundColor: C.bg, width: '100%', maxWidth: 420, maxHeight: '88%', borderRadius: Radius.xl, overflow: 'hidden' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 },
+  cardTitle: { ...Type.h2, color: C.text, flex: 1, lineHeight: 30 },
+  scroll: { flexGrow: 0 },
+  content: { paddingHorizontal: 20, paddingTop: 8 },
 
   // Receipt attachment
   receiptDropZone: {
@@ -666,10 +590,6 @@ const s = StyleSheet.create({
   catCreateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12 },
   catCreateText: { ...Type.labelMedium, color: C.primary },
 
-  // Dates inline row
-  datesRow: { flexDirection: 'row', alignItems: 'stretch' },
-  datesDivider: { width: 1, backgroundColor: C.border },
-
   // Amount row (inside card)
   amountRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -694,7 +614,7 @@ const s = StyleSheet.create({
 
   // Footer
   errorText: { color: C.error, textAlign: 'center', ...Type.cardDesc, paddingHorizontal: 16, paddingBottom: 4 },
-  footer: { padding: 16, paddingTop: 8, flexDirection: 'row', gap: 10 },
+  footer: { paddingHorizontal: 20, paddingBottom: 20, paddingTop: 8, flexDirection: 'row', gap: 10 },
 
   // Category rename modal
   modalTitle: { ...Type.cardTitle, color: C.text },

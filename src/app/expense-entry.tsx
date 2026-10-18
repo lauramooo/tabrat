@@ -1,4 +1,3 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressBtn } from '@/components/PressBtn';
 import { CheckCircleIcon, PencilIcon, PlusIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { useRouter } from 'expo-router';
@@ -24,17 +23,17 @@ import type { ReceiptItem } from '@/types';
 type ItemData = { id: string; name: string; price: number; quantity: number };
 
 function ActionPill({
-  progress, icon, iconNode, label, color, textColor = C.text, onPress,
+  progress, iconNode, label, color, textColor = C.text, onPress,
 }: {
   progress: Animated.AnimatedInterpolation<number>;
-  icon?: string; iconNode?: (color: string) => React.ReactNode; label: string; color: string; textColor?: string; onPress: () => void;
+  iconNode: (color: string) => React.ReactNode; label: string; color: string; textColor?: string; onPress: () => void;
 }) {
   const width = progress.interpolate({ inputRange: [0, 1], outputRange: [36, 74], extrapolate: 'clamp' });
   const textOp = progress.interpolate({ inputRange: [0.5, 0.9], outputRange: [0, 1], extrapolate: 'clamp' });
   return (
     <PressBtn style={s.actionWrap} onPress={onPress} activeOpacity={0.85}>
       <Animated.View style={[s.actionPill, { width, backgroundColor: color }]}>
-        {iconNode ? iconNode(textColor) : <MaterialCommunityIcons name={icon as any} size={15} color={textColor} />}
+        {iconNode(textColor)}
         <Animated.Text style={[s.actionLabel, { opacity: textOp, color: textColor }]}>{label}</Animated.Text>
       </Animated.View>
     </PressBtn>

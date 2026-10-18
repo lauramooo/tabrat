@@ -13,6 +13,9 @@ export const Type = {
   fieldLabel:   { fontFamily: 'Poppins_600SemiBold', fontSize: 13, letterSpacing: 0.8 },
   cardTitle:    { fontFamily: 'Poppins_700Bold',     fontSize: 14 },
   cardDesc:     { fontFamily: 'Poppins_400Regular',  fontSize: 14 },
+  // Placeholder / empty-state text ("Nothing here yet", "No expenses yet…", "Set a payer…") — one
+  // token so every placeholder on the trip/home Dashboard and Expenses tabs matches. Use with C.textDim.
+  note:         { fontFamily: 'Poppins_400Regular',  fontSize: 14 },
   // The 500-weight equivalent of `body`/`bodySmall` — used for list-row names, dropdown text,
   // form values, and similar mid-weight labels. Added to absorb the ~40 call sites that were
   // duplicating 'Poppins_500Medium' + a hand-picked size (mostly 13-15px) with no shared token.

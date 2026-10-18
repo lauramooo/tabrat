@@ -14,7 +14,8 @@ import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { InputMetrics } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
-import { fmtDate } from '@/utils/date';
+import { fmtDate, parseLocalDate } from '@/utils/date';
+import { resolveReceiptUri } from '@/utils/receiptImage';
 import { selectionHaptic, lightHaptic } from '@/utils/haptics';
 
 let DateTimePicker: any = null;
@@ -23,7 +24,7 @@ if (Platform.OS !== 'web') {
 }
 
 function toInputDate(str: string): string {
-  const d = new Date(str);
+  const d = parseLocalDate(str);
   if (isNaN(d.getTime())) return '';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -260,7 +261,7 @@ export function BillHeader() {
           <Pressable style={styles.receiptSheet} onPress={() => {}}>
             <CircleIconButton variant="close" size={22} color="#fff" onPress={() => setShowReceiptModal(false)} style={styles.receiptClose} />
             {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.receiptImage} resizeMode="contain" />
+              <Image source={{ uri: resolveReceiptUri(imageUri)! }} style={styles.receiptImage} resizeMode="contain" />
             ) : (
               <View style={styles.receiptEmpty}>
                 <MaterialCommunityIcons name="image-off-outline" size={48} color={C.textDim} />
@@ -279,7 +280,7 @@ export function ReceiptHeader({ editableName }: { editableName?: boolean } = {})
   const [showPicker, setShowPicker] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
-  const parsedDate = (() => { const d = new Date(receiptDate); return isNaN(d.getTime()) ? new Date() : d; })();
+  const parsedDate = (() => { const d = parseLocalDate(receiptDate); return isNaN(d.getTime()) ? new Date() : d; })();
 
   if (!editableName && !restaurantName && !receiptDate) return null;
 
@@ -317,7 +318,7 @@ export function ReceiptHeader({ editableName }: { editableName?: boolean } = {})
           <Pressable style={styles.receiptSheet} onPress={() => {}}>
             <CircleIconButton variant="close" size={22} color="#fff" onPress={() => setShowReceipt(false)} style={styles.receiptClose} />
             {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.receiptImage} resizeMode="contain" />
+              <Image source={{ uri: resolveReceiptUri(imageUri)! }} style={styles.receiptImage} resizeMode="contain" />
             ) : (
               <View style={styles.receiptEmpty}>
                 <MaterialCommunityIcons name="image-off-outline" size={48} color={C.textDim} />

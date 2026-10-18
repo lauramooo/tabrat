@@ -40,13 +40,16 @@ export async function pullRemoteStateAndReplace(userId: string) {
     id: g.id, name: g.name, icon: g.icon, members: g.members ?? [],
   }));
   const mappedFriends: Person[] = (friends.data ?? []).map((f) => ({ id: f.id, name: f.name }));
+  // Receipt photos that never reach the server (web data: URIs) survive the pull from this device.
+  const localImages = new Map(useSplitStore.getState().history.map((r) => [r.id, r.imageUri]));
   const mappedHistory: SplitRecord[] = (history.data ?? []).map((r) => ({
     id: r.id, date: r.date, restaurantName: r.restaurant_name ?? undefined, receiptDate: r.receipt_date ?? undefined,
+    receiptEndDate: r.receipt_end_date || undefined,
     total: r.total, people: r.people ?? [], itemCount: r.item_count,
     items: (r.items ?? undefined) as ReceiptItem[] | undefined,
     fullPeople: (r.full_people ?? undefined) as Person[] | undefined,
     extraCharges: (r.extra_charges ?? undefined) as ExtraCharge[] | undefined,
-    tax: r.tax ?? undefined, tip: r.tip ?? undefined, imageUri: r.image_uri ?? undefined,
+    tax: r.tax ?? undefined, tip: r.tip ?? undefined, imageUri: r.image_uri ?? localImages.get(r.id),
     paidById: r.paid_by_id ?? undefined, paidByName: r.paid_by_name ?? undefined,
     tripId: r.trip_id ?? undefined, homeId: r.home_id ?? undefined,
     personAmounts: (r.person_amounts ?? undefined) as { name: string; amount: number }[] | undefined,

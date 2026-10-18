@@ -1,10 +1,9 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressBtn } from '@/components/PressBtn';
-import { CameraIcon, PencilIcon, ReceiptShapeIcon, ScanIcon } from '@/components/FigmaIcons';
+import { CameraIcon, PencilIcon, ReceiptShapeIcon, ScanIcon, TrashIcon } from '@/components/FigmaIcons';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS, Alert, Image, PanResponder, Platform,
   StyleSheet, View,
@@ -13,12 +12,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { Button, CircleIconButton, ConfirmModal } from '@/components/design';
 import { C } from '@/constants/colors';
+import { Radius } from '@/constants/spacing';
 import { Type } from '@/constants/typography';
 import { FlowSteps } from '@/components/FlowSteps';
+import { ScanningOverlay } from '@/components/ScanningOverlay';
 import { useSplitStore } from '@/store/useSplitStore';
 import { getStorageItem, setStorageItem } from './settings';
 import { supabase } from '@/lib/supabase';
 import { parseReceiptViaProxy, UNREADABLE_RECEIPT } from '@/utils/receiptParser';
+import { deleteReceiptImage, readReceiptBase64, resolveReceiptUri, saveReceiptImage } from '@/utils/receiptImage';
 import { errorMessage } from '@/utils/errors';
 import { lightHaptic, mediumHaptic, errorHaptic } from '@/utils/haptics';
 // Set once the user OKs sending receipt photos to Anthropic — App Store guideline 5.1.2(i)
@@ -58,15 +60,45 @@ async function uriToBase64Web(uri: string): Promise<string | null> {
   } catch { return null; }
 }
 
+// Memoized so dragging a crop corner (a re-render per pointer move) doesn't re-render the photo.
+// On web the photo is a multi-MB data: URI; re-applying it on every move made the browser re-decode
+// it each time — the drag lagged and the photo flashed black.
+const ReceiptPhoto = memo(function ReceiptPhoto({ uri, onSize }: {
+  uri: string; onSize: (size: { w: number; h: number }) => void;
+}) {
+  return (
+    <Image
+      source={{ uri }}
+      style={StyleSheet.absoluteFill}
+      resizeMode="contain"
+      onLoad={e => {
+        const src = (e.nativeEvent as Record<string, any>)?.source;
+        if (src?.width && src?.height) {
+          onSize({ w: src.width as number, h: src.height as number });
+        }
+      }}
+    />
+  );
+});
+
 export default function UploadScreen() {
   const router = useRouter();
-  const { imageUri: storeUri, imageBase64: storeB64, setImage, setReceiptData } = useSplitStore();
+  const { imageUri: storeUri, items, setImage, setReceiptData } = useSplitStore();
 
-  const [uri, setUri] = useState<string | null>(storeUri);
-  const [base64, setBase64] = useState<string | null>(storeB64);
+  // A scanned receipt stays on the bill (storeUri) for reference; `uri`/`base64` are only the
+  // photo being cropped for a new scan — empty until the user imports one or taps Rescan.
+  const [uri, setUri] = useState<string | null>(null);
+  const [base64, setBase64] = useState<string | null>(null);
+  const [rescanning, setRescanning] = useState(false);
+  const [replaceVisible, setReplaceVisible] = useState(false);
+  const [removeVisible, setRemoveVisible] = useState(false);
+  const [savedMissing, setSavedMissing] = useState(false);
+  const savedUri = resolveReceiptUri(storeUri);
+  const showSaved = !!savedUri && !rescanning;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [consentVisible, setConsentVisible] = useState(false);
+  const scanAbortRef = useRef<AbortController | null>(null);
   // Crop state
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
   const [imgSize, setImgSize] = useState({ w: 1, h: 1 });
@@ -221,8 +253,40 @@ export default function UploadScreen() {
 
   const handleScan = async () => {
     if (!uri || !base64) { setError('Please select an image first.'); return; }
+    if (items.length > 0) { setReplaceVisible(true); return; }
+    startScan();
+  };
+
+  const startScan = async () => {
+    setReplaceVisible(false);
     if ((await getStorageItem(AI_SCAN_CONSENT_KEY)) !== '1') { setConsentVisible(true); return; }
     runScan();
+  };
+
+  // Back into the crop view with the saved photo, so the user can crop tighter (or tap X to swap
+  // in a new photo) before scanning again.
+  const handleRescan = async () => {
+    lightHaptic();
+    const b64 = storeUri ? await readReceiptBase64(storeUri) : null;
+    setError(null);
+    setImgSize({ w: 1, h: 1 }); setCropReady(false); setUserAdjustedCrop(false);
+    setUri(b64 ? savedUri : null);
+    setBase64(b64);
+    setRescanning(true);
+  };
+
+  const handleBackToSaved = () => {
+    lightHaptic();
+    setUri(null); setBase64(null); setError(null);
+    setRescanning(false);
+  };
+
+  const handleRemove = () => {
+    setRemoveVisible(false);
+    deleteReceiptImage(storeUri);
+    setImage(null, null);
+    setSavedMissing(false);
+    setRescanning(false);
   };
 
   const handleConsent = async () => {
@@ -231,8 +295,16 @@ export default function UploadScreen() {
     runScan();
   };
 
+  const handleCancelScan = () => {
+    lightHaptic();
+    scanAbortRef.current?.abort();
+    setLoading(false);
+  };
+
   const runScan = async () => {
     if (!uri || !base64) return;
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
     setError(null);
     mediumHaptic();
     setLoading(true);
@@ -273,22 +345,27 @@ export default function UploadScreen() {
       }
       const ref = await context.renderAsync();
       const result = await ref.saveAsync({ compress: 0.85, format: SaveFormat.JPEG, base64: true });
-      const scanUri = result.uri;
       const scanB64 = result.base64 ?? base64;
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { errorHaptic(); setLoading(false); return; }
-      const data = await parseReceiptViaProxy(scanB64, process.env.EXPO_PUBLIC_SUPABASE_URL!, session.access_token);
+      const data = await parseReceiptViaProxy(scanB64, process.env.EXPO_PUBLIC_SUPABASE_URL!, session.access_token, controller.signal);
+      if (controller.signal.aborted) return;
       if (!data.items?.length) {
         errorHaptic();
         setError(UNREADABLE_RECEIPT);
         setLoading(false);
         return;
       }
-      setImage(scanUri, scanB64);
+      deleteReceiptImage(storeUri);
+      setImage(saveReceiptImage(scanB64), null);
+      setSavedMissing(false);
+      setRescanning(false);
+      setUri(null); setBase64(null);
       setReceiptData(data);
       router.replace('/review');
     } catch (e: unknown) {
+      if (controller.signal.aborted) return; // cancelled — back to the photo, no error
       errorHaptic();
       setError(errorMessage(e, 'Unknown error'));
     } finally {
@@ -299,7 +376,7 @@ export default function UploadScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen options={{
-        headerBackTitle: '', headerTitleAlign: 'center', title: 'Upload',
+        headerBackTitle: '', headerTitleAlign: 'center', title: showSaved ? 'Receipt' : 'Upload',
         headerTransparent: false, headerStyle: { backgroundColor: C.bg },
         // iOS's edge-swipe-back gesture listens on the left edge of the screen, which is exactly
         // where the crop box's left handle lives — disable it while a photo (and its crop handles)
@@ -321,17 +398,7 @@ export default function UploadScreen() {
                   setContainerSize({ w: width, h: height });
                 }}
               >
-                <Image
-                  source={{ uri }}
-                  style={StyleSheet.absoluteFill}
-                  resizeMode="contain"
-                  onLoad={e => {
-                    const src = (e.nativeEvent as Record<string, any>)?.source;
-                    if (src?.width && src?.height) {
-                      setImgSize({ w: src.width as number, h: src.height as number });
-                    }
-                  }}
-                />
+                <ReceiptPhoto uri={uri} onSize={setImgSize} />
                 {cropReady && (
                   <>
                     <View pointerEvents="none" style={[styles.shade, { top: 0, left: 0, right: 0, height: cropBox.y }]} />
@@ -344,8 +411,32 @@ export default function UploadScreen() {
                     ))}
                   </>
                 )}
+                {cropReady && !userAdjustedCrop && !loading && (
+                  <View pointerEvents="none" style={styles.cropTipWrap}>
+                    <Text style={styles.tipPill}>Crop out anything that isn't the receipt</Text>
+                  </View>
+                )}
+                {loading && (
+                  <ScanningOverlay
+                    frame={cropReady
+                      ? { top: cropBox.y, left: cropBox.x, width: cropBox.w, height: cropBox.h }
+                      : { top: 0, left: 0, width: containerSize.w, height: containerSize.h }}
+                  />
+                )}
               </View>
               <CircleIconButton variant="close" size={22} color={C.text} onPress={clearImage} style={styles.imageClearBtn} />
+            </View>
+          </View>
+        ) : showSaved ? (
+          <View style={styles.imageArea}>
+            <View style={styles.savedWrapper}>
+              {savedMissing ? (
+                <View style={styles.savedMissing}>
+                  <Text style={styles.savedMissingText}>This receipt photo isn't saved on this device.</Text>
+                </View>
+              ) : (
+                <Image source={{ uri: savedUri! }} style={StyleSheet.absoluteFill} resizeMode="contain" onError={() => setSavedMissing(true)} />
+              )}
             </View>
           </View>
         ) : (
@@ -357,38 +448,83 @@ export default function UploadScreen() {
                 <Text style={styles.placeholderText}>Tap to import</Text>
               </View>
             </PressBtn>
-            <Text style={styles.scanHint}>Flat, well-lit, and fully in frame scans best</Text>
+            <Text style={[styles.tipPill, { marginTop: 16 }]}>Flat, well-lit, and fully in frame scans best</Text>
           </View>
         )}
 
         {error ? (
           <Text variant="bodySmall" style={styles.errorText}>{error}</Text>
-        ) : uri ? (
-          <Text variant="bodySmall" style={styles.hintText}>Crop to just the receipt for the best scan</Text>
         ) : null}
 
         {/* -- Unified footer: Enter Manually + Import (?Scan) -- */}
-        <View style={styles.btnRow}>
-          <Button
-            variant="secondary"
-            size="big"
-            label="Enter manually"
-            icon={<PencilIcon color={C.text} size={16} />}
-            onPress={handleManualEntry}
-            style={{ flex: 1 }}
-          />
-          <Button
-            variant="primary"
-            size="big"
-            label={loading ? 'Scanning...' : 'Scan receipt'}
-            icon={<ScanIcon color={C.text} size={18} />}
-            onPress={uri ? handleScan : undefined}
-            disabled={!uri || loading}
-            style={{ flex: 1 }}
-          />
-        </View>
+        {showSaved && !uri ? (
+          <View style={styles.btnRow}>
+            <Button
+              variant="secondary"
+              size="big"
+              label="Remove"
+              icon={<TrashIcon color={C.text} size={16} />}
+              onPress={() => { lightHaptic(); setRemoveVisible(true); }}
+              style={{ flex: 1 }}
+            />
+            <Button
+              variant="primary"
+              size="big"
+              label="Rescan"
+              icon={<ScanIcon color={C.text} size={18} />}
+              onPress={handleRescan}
+              style={{ flex: 1 }}
+            />
+          </View>
+        ) : (
+          <View style={styles.btnRow}>
+            {rescanning ? (
+              <Button variant="secondary" size="big" label="Back" onPress={handleBackToSaved} disabled={loading} style={{ flex: 1 }} />
+            ) : (
+              <Button
+                variant="secondary"
+                size="big"
+                label="Enter manually"
+                icon={<PencilIcon color={C.text} size={16} />}
+                onPress={handleManualEntry}
+                style={{ flex: 1 }}
+              />
+            )}
+            {loading ? (
+              <Button variant="secondary" size="big" label="Cancel" onPress={handleCancelScan} style={{ flex: 1 }} />
+            ) : (
+              <Button
+                variant="primary"
+                size="big"
+                label="Scan receipt"
+                icon={<ScanIcon color={C.text} size={18} />}
+                onPress={uri ? handleScan : undefined}
+                disabled={!uri}
+                style={{ flex: 1 }}
+              />
+            )}
+          </View>
+        )}
       </View>
 
+      <ConfirmModal
+        visible={replaceVisible}
+        onClose={() => setReplaceVisible(false)}
+        onConfirm={startScan}
+        title="Replace your items?"
+        body="The new scan replaces this bill's items and who they're assigned to."
+        cancelLabel="Keep items"
+        confirmLabel="Rescan"
+      />
+      <ConfirmModal
+        visible={removeVisible}
+        onClose={() => setRemoveVisible(false)}
+        onConfirm={handleRemove}
+        title="Remove receipt photo?"
+        body="Your items stay on the bill."
+        cancelLabel="Keep"
+        confirmLabel="Remove"
+      />
       <ConfirmModal
         visible={consentVisible}
         onClose={() => setConsentVisible(false)}
@@ -410,6 +546,9 @@ const styles = StyleSheet.create({
   imageGroup: { flex: 1, flexDirection: 'row', width: '85%', gap: 10 },
   imageWrapper: { flex: 1, borderRadius: 10, overflow: 'hidden', backgroundColor: '#111' },
   imageClearBtn: { alignSelf: 'flex-start' },
+  savedWrapper: { flex: 1, width: '85%', borderRadius: Radius.sm, overflow: 'hidden', backgroundColor: C.card },
+  savedMissing: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  savedMissingText: { ...Type.labelMedium, color: C.textSub, textAlign: 'center' },
 
   shade: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.6)' },
   cropBorder: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(255,255,255,0.95)' },
@@ -434,10 +573,22 @@ const styles = StyleSheet.create({
     color: C.text, textAlign: 'center',
     lineHeight: 14,
   },
-  scanHint: { ...Type.cardDesc, color: C.textDim, textAlign: 'center', marginTop: 12 },
 
   btnRow: { flexDirection: 'row', gap: 10 },
   errorText: { color: C.error, textAlign: 'center', paddingHorizontal: 8 },
-  hintText: { color: C.textSub, textAlign: 'center', paddingHorizontal: 8 },
+  // Shown over the photo until the user first moves a crop corner. Centered so it never sits on
+  // top of a corner handle; pointerEvents none so it can't block a drag either.
+  cropTipWrap: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  // Yellow photo-tip pill, shared by the import-screen tip and the crop tip on the photo.
+  tipPill: {
+    ...Type.labelMedium,
+    color: C.text,
+    backgroundColor: C.yellow,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
+  },
 
 });

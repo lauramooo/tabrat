@@ -1,5 +1,5 @@
 import { PressBtn } from '@/components/PressBtn';
-import { ChevronDownCircleIcon, ChevronUpCircleIcon, HomeTypeIcon, PlusCircleIcon, UserIcon } from '@/components/FigmaIcons';
+import { ChevronDownCircleIcon, ChevronUpCircleIcon, HomeTypeIcon, PlusCircleIcon, UserIcon, UserMultipleIcon } from '@/components/FigmaIcons';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
@@ -167,7 +167,7 @@ export default function NewHomeScreen() {
             {filteredGroups.map((g) => (
               <DropdownRow
                 key={g.id}
-                icon={<Text style={{ fontSize: 14, width: 16, textAlign: 'center' }}>{g.icon}</Text>}
+                icon={<UserMultipleIcon size={15} color={C.textSub} />}
                 onPress={() => addGroupMembers(g.id)}
               >
                 <Text style={s.friendDropName}>{g.name}</Text>
@@ -184,7 +184,7 @@ export default function NewHomeScreen() {
         <Button
           variant="primary"
           size="big"
-          label="Create Home"
+          label="Create home"
           icon={<HomeTypeIcon size={18} color={C.text} />}
           onPress={handleCreate}
         />
@@ -202,7 +202,7 @@ const s = StyleSheet.create({
 
   peopleChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
 
-  friendDropName: { flex: 1, ...Type.labelMedium, color: C.text },
+  friendDropName: { ...Type.labelMedium, color: C.text },
   friendDropSub: { ...Type.cardDesc, color: C.textDim },
 
   errorText: { color: C.error, ...Type.cardDesc, marginTop: 8 },

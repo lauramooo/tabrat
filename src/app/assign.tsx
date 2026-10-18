@@ -1,4 +1,3 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressBtn } from '@/components/PressBtn';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -12,6 +11,7 @@ import { PersonChip } from '@/components/PersonChip';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { useSplitStore } from '@/store/useSplitStore';
+import { itemDetailLabels } from '@/utils/items';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { fmt } from '@/utils/calculator';
 import { errorHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
@@ -176,8 +176,8 @@ export default function AssignScreen() {
                       </View>
                     )}
                   </View>
-                  {!!item.modifiers?.length && (
-                    <Text style={styles.itemModifiers} numberOfLines={2}>{item.modifiers.join(', ')}</Text>
+                  {itemDetailLabels(item).length > 0 && (
+                    <Text style={styles.itemModifiers} numberOfLines={2}>{itemDetailLabels(item).join(', ')}</Text>
                   )}
                 </View>
                 <Text style={styles.itemPrice}>{fmt(item.price)}</Text>

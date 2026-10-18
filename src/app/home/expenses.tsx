@@ -1,17 +1,22 @@
 import { PressBtn } from '@/components/PressBtn';
-import { BillTypeIcon, CalendarIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, ExpenseIcon, LinkIcon, PlusIcon, ReceiptIcon, TrashIcon } from '@/components/FigmaIcons';
+import { BillTypeIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, ExpenseIcon, LinkIcon, PlusIcon, ReceiptIcon, TrashIcon } from '@/components/FigmaIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { createElement, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Dimensions, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet,
+  Dimensions, FlatList, Modal, Pressable, ScrollView, StyleSheet,
   TextInput, View,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { ActionPill } from '@/components/ActionPill';
-import { Button, Card, CenteredModal, CircleIconButton, Dropdown, DropdownRow, FieldLabel, IconBadge, Input, SectionLabel } from '@/components/design';
+import { Button, Card, CenteredModal, CircleIconButton, ConfirmModal, DateRangeField, Dropdown, DropdownRow, FieldLabel, IconBadge, Input, SectionLabel } from '@/components/design';
+import { GroupHeader, HeaderMonthPicker } from '@/components/GroupHeader';
+import { QuickAddBar } from '@/components/QuickAddBar';
+import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
+import { ShareCodeModal } from '@/components/ShareCodeModal';
+import { requestGroupEdit } from '@/utils/pendingGroupEdit';
 import { AVATAR_PALETTE, C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
@@ -26,16 +31,6 @@ import { applyTextShortcuts } from '@/utils/text';
 import type { SplitRecord } from '@/types';
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-function toInputDate(str: string): string {
-  const d = new Date(str);
-  if (isNaN(d.getTime())) return '';
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function fromInputDate(val: string): string {
-  const formatted = fmtDate(val + 'T00:00:00');
-  return formatted || val;
-}
 
 function toISO(d: string): string {
   const m = d.match(/^(\w+)\s+(\d+),\s*(\d+)$/);
@@ -73,6 +68,7 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
   const [participants, setParticipants] = useState<string[]>([]);
   const [category, setCategory] = useState<string | null>(null);
   const [date, setDate] = useState(today);
+  const [endDate, setEndDate] = useState('');
   const [catOpen, setCatOpen] = useState(false);
   const [catDropPos, setCatDropPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const catBtnRef = useRef<View>(null);
@@ -81,7 +77,7 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
   useEffect(() => {
     if (visible) {
       setName(''); setAmount(''); setCategory(null); setCatOpen(false);
-      setDate(today()); setError(null);
+      setDate(today()); setEndDate(''); setError(null);
       const sorted = sortWithMeFirst(members, myName);
       setParticipants([...sorted]);
       setPaidBy(sorted[0] ?? null);
@@ -105,7 +101,7 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
     if (!paidBy) { setError('Select who paid'); return; }
     mediumHaptic();
     saveHomeExpenseDirectly({
-      name: name.trim(), receiptDate: date, category,
+      name: name.trim(), receiptDate: date, receiptEndDate: endDate || undefined, category,
       amount: amt, participants: participants.length > 0 ? participants : members,
       paidByName: paidBy, homeId,
     });
@@ -170,26 +166,14 @@ function AddExpenseModal({ visible, onClose, members, categories, homeId }: {
               ))}
             </Dropdown>
 
-            <FieldLabel style={{ marginBottom: 6 }}>DATE</FieldLabel>
-            <Card row={false} padding={0} radius={10} style={{ marginBottom: 16, overflow: 'hidden' }}>
-              <View style={s.expRow}>
-                <CalendarIcon size={15} color={C.text} />
-                {Platform.OS === 'web' ? (
-                  <View style={{ flex: 1, position: 'relative' }}>
-                    <Text style={[s.expText, !date && { color: C.textDim }]}>{date || 'Select date'}</Text>
-                    {createElement('input', {
-                      type: 'date', value: toInputDate(date),
-                      onChange: (e: any) => { const v = e.target.value; if (v) setDate(fromInputDate(v)); },
-                      style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0, cursor: 'pointer' } as any,
-                    })}
-                  </View>
-                ) : (
-                  <TextInput style={[s.expInput, { outlineWidth: 0 } as any]}
-                    value={date} onChangeText={setDate}
-                    placeholder="Jun 1, 2025" placeholderTextColor={C.textDim} />
-                )}
-              </View>
-            </Card>
+            <FieldLabel style={{ marginBottom: 6 }}>DATES</FieldLabel>
+            <DateRangeField
+              startDate={date}
+              endDate={endDate}
+              onChange={(st, en) => { setDate(st); setEndDate(en); }}
+              clearable={false}
+              style={{ marginBottom: 16 }}
+            />
 
             <FieldLabel style={{ marginBottom: 6 }}>AMOUNT</FieldLabel>
             <Card row={false} padding={0} radius={10} style={[s.moneyCard, amountFocused && s.moneyCardFocused, { overflow: 'hidden' }]}>
@@ -253,6 +237,7 @@ function HomeQuickEditModal({ exp, categories, onClose }: {
   const { updateRecord } = useSplitStore();
   const [name, setName] = useState(exp.restaurantName ?? '');
   const [date, setDate] = useState(exp.receiptDate ?? '');
+  const [endDate, setEndDate] = useState(exp.receiptEndDate ?? '');
   const [catOpen, setCatOpen] = useState(false);
   const [catDropPos, setCatDropPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const catBtnRef = useRef<View>(null);
@@ -263,6 +248,8 @@ function HomeQuickEditModal({ exp, categories, onClose }: {
     updateRecord(exp.id, {
       restaurantName: name.trim() || undefined,
       receiptDate: date || undefined,
+      // '' (not undefined) when cleared, so the cleared range still syncs.
+      receiptEndDate: exp.receiptEndDate || endDate ? endDate : undefined,
       expenseCategory: category ?? undefined,
     });
     onClose();
@@ -285,24 +272,14 @@ function HomeQuickEditModal({ exp, categories, onClose }: {
             autoFocus returnKeyType="done"
           />
 
-          <FieldLabel style={{ marginBottom: 6 }}>DATE</FieldLabel>
-          <Card row={false} padding={0} radius={10} style={{ marginBottom: 14, overflow: 'hidden' }}>
-            <View style={s.expRow}>
-              <CalendarIcon size={15} color={C.text} />
-              {Platform.OS === 'web' ? (
-                <View style={{ flex: 1, position: 'relative' }}>
-                  <Text style={[s.expText, !date && { color: C.textDim }]}>{date || 'Select date'}</Text>
-                  {createElement('input', {
-                    type: 'date', value: toInputDate(date),
-                    onChange: (e: any) => { const v = e.target.value; if (v) setDate(fromInputDate(v)); },
-                    style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0, cursor: 'pointer' } as any,
-                  })}
-                </View>
-              ) : (
-                <Text style={[s.expText, { flex: 1 }, !date && { color: C.textDim }]}>{date || 'Select date'}</Text>
-              )}
-            </View>
-          </Card>
+          <FieldLabel style={{ marginBottom: 6 }}>DATES</FieldLabel>
+          <DateRangeField
+            startDate={date}
+            endDate={endDate}
+            onChange={(st, en) => { setDate(st); setEndDate(en); }}
+            clearable={false}
+            style={{ marginBottom: 14 }}
+          />
 
           <FieldLabel style={{ marginBottom: 6 }}>CATEGORY</FieldLabel>
           <Card row={false} padding={0} radius={10} style={{ marginBottom: 16, overflow: 'hidden' }}>
@@ -387,14 +364,15 @@ function HomeExpenseRow({ exp, catColor, onDelete, onEdit, onOpen }: {
 }
 
 export default function HomeExpensesScreen() {
-  const { homeId } = useLocalSearchParams<{ homeId: string }>();
+  const { homeId, openAdd } = useLocalSearchParams<{ homeId: string; openAdd?: string }>();
   const router = useRouter();
   const myName = useMyName();
-  const { homes, history, homeExpenseCategories, deleteHistory, startHomeEntry, linkTabToHome, saveHomeExpenseDirectly } = useSplitStore();
+  const { homes, history, homeExpenseCategories, deleteHistory, startHomeEntry, linkTabToHome, saveHomeExpenseDirectly, closeHome, reopenHome, deleteHome } = useSplitStore();
 
   const home = homes.find((h) => h.id === homeId);
   const [addVisible, setAddVisible] = useState(false);
-  const [addSheetVisible, setAddSheetVisible] = useState(false);
+  // The dashboard's "Add expense" lands here with the add sheet already open.
+  const [addSheetVisible, setAddSheetVisible] = useState(openAdd === 'true');
   const [importVisible, setImportVisible] = useState(false);
   const [quickEditExp, setQuickEditExp] = useState<SplitRecord | null>(null);
   const activeSwipeable = useRef<Swipeable | null>(null);
@@ -423,14 +401,9 @@ export default function HomeExpensesScreen() {
   const dayScrollRef = useRef<FlatList<any>>(null);
   const [dayStripW, setDayStripW] = useState(0);
 
-  const [quickName, setQuickName] = useState('');
-  const [quickAmountText, setQuickAmountText] = useState('');
-  const [quickPayer, setQuickPayer] = useState<string | null>(null);
-  const [quickPayerDropOpen, setQuickPayerDropOpen] = useState(false);
-  const [quickPayerDropPos, setQuickPayerDropPos] = useState<{ bottom: number; right: number } | null>(null);
-  const quickPayerBtnRef = useRef<View>(null);
-  const [quickNameFocused, setQuickNameFocused] = useState(false);
-  const [quickAmountFocused, setQuickAmountFocused] = useState(false);
+  const [actionsMenu, setActionsMenu] = useState(false);
+  const [shareModal, setShareModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   const importableBills = useMemo(() =>
     history.filter((r) => !r.homeId && !r.tripId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
@@ -528,23 +501,6 @@ export default function HomeExpensesScreen() {
     }
   };
 
-  const quickAmount = parseFloat(quickAmountText) || 0;
-  const canSaveQuick = quickName.trim().length > 0 && quickAmount > 0 && !!quickPayer;
-  const quickAddStarted = quickName.trim().length > 0 || quickAmountText.length > 0 || !!quickPayer;
-
-  const openQuickPayerDropdown = () => {
-    selectionHaptic();
-    if (quickPayerBtnRef.current) {
-      quickPayerBtnRef.current.measureInWindow((_x: number, y: number) => {
-        const sh = Dimensions.get('window').height;
-        setQuickPayerDropPos({ bottom: sh - y + 4, right: 16 });
-        setQuickPayerDropOpen(true);
-      });
-    } else {
-      setQuickPayerDropOpen((o) => !o);
-    }
-  };
-
   if (!home) {
     return (
       <SafeAreaView style={s.safe} edges={['bottom']}>
@@ -558,42 +514,37 @@ export default function HomeExpensesScreen() {
   const homePeople = sortWithMeFirst(home.members, myName);
   const categories = homeExpenseCategories;
 
-  const handleQuickSave = () => {
-    if (!canSaveQuick || !quickPayer) return;
-    mediumHaptic();
+  const handleQuickSave = ({ name, amount, payer }: { name: string; amount: number; payer: string }) => {
     saveHomeExpenseDirectly({
-      name: quickName.trim(),
+      name,
       receiptDate: fmtDate(new Date()),
       category: null,
-      amount: quickAmount,
+      amount,
       participants: home.members,
-      paidByName: quickPayer,
+      paidByName: payer,
       homeId: home.id,
     });
-    setQuickName('');
-    setQuickAmountText('');
-    setQuickPayer(null);
   };
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <Stack.Screen options={{
-        title: `${home.name} expenses`,
-        headerTitleAlign: 'left',
+        headerTitleAlign: 'center',
         headerTransparent: false,
         headerStyle: { backgroundColor: C.bg },
+        title: '',
+        headerTitle: () => null,
+        // This page is the home's Expenses tab, pushed over its Dashboard tab — back returns there.
         headerLeft: () => (
           <CircleIconButton variant="back" size={28} color={C.primary} onPress={() => router.back()} style={{ paddingHorizontal: 12 }} />
         ),
+        headerRight: () => <GroupActionsButton onPress={() => setActionsMenu(true)} />,
       }} />
+      <GroupHeader name={home.name} people={homePeople}
+        subtitle={<HeaderMonthPicker label={`${MONTH_NAMES[viewMonth]} ${viewYear}`} onPrev={prevMonth} onNext={nextMonth} nextDisabled={isCurrentMonth} />}
+        active="expenses" onSelectTab={() => { selectionHaptic(); router.back(); }} />
 
       <View style={s.expHeaderRow}>
-        <View style={s.monthNavGroup}>
-          <CircleIconButton variant="back" size={18} color={C.primary} onPress={prevMonth} hitSlop={10} />
-          <Text style={s.monthNavLabel}>{MONTH_NAMES[viewMonth]} {viewYear}</Text>
-          <CircleIconButton variant="back" size={18} color={isCurrentMonth ? C.textDim : C.primary} onPress={nextMonth}
-            disabled={isCurrentMonth} hitSlop={10} style={{ transform: [{ rotate: '180deg' }] }} />
-        </View>
         <PressBtn ref={scopeBtnRef} style={s.scopeDrop} onPress={openScopeDropdown} activeOpacity={0.8}>
           <Text style={s.scopeDropText}>
             {scopePerson ? (scopePerson === myName ? `${scopePerson} (me)` : scopePerson) : 'Everyone'}
@@ -715,69 +666,37 @@ export default function HomeExpensesScreen() {
         <View style={{ height: 8 }} />
       </ScrollView>
 
-      <View style={s.quickAddRow}>
-        <Card padding={0} row={false} radius={10} style={[s.quickAddNameCard, quickNameFocused && s.quickAddFieldActive]}>
-          <TextInput
-            style={[s.quickAddNameInput, { outlineWidth: 0 } as any]}
-            value={quickName}
-            onChangeText={(v) => setQuickName(applyTextShortcuts(v))}
-            onFocus={() => setQuickNameFocused(true)}
-            onBlur={() => setQuickNameFocused(false)}
-            placeholder="Quick add"
-            placeholderTextColor={C.textDim}
-            returnKeyType="next"
-          />
-        </Card>
-        <Card padding={0} row={false} radius={10} style={[s.quickAddAmountCard, quickAmountFocused && s.quickAddFieldActive]}>
-          <View style={s.quickAddAmountInner}>
-            <Text style={s.moneyPrefix}>{getCurrencySymbol('USD')}</Text>
-            <TextInput
-              style={[s.quickAddAmountInput, { outlineWidth: 0 } as any]}
-              value={quickAmountText}
-              onChangeText={(v) => setQuickAmountText(sanitizeNumberInput(v))}
-              onFocus={() => setQuickAmountFocused(true)}
-              onBlur={() => setQuickAmountFocused(false)}
-              keyboardType="decimal-pad"
-              placeholder="0"
-              placeholderTextColor={C.textDim}
-              returnKeyType="done"
-              onSubmitEditing={handleQuickSave}
-            />
-          </View>
-        </Card>
-        <PressBtn ref={quickPayerBtnRef} style={[s.quickAddPayerBtn, quickPayerDropOpen && s.quickAddFieldActive]} onPress={openQuickPayerDropdown} noShadow>
-          <Text style={[s.quickAddPayerText, !quickPayer && { color: C.textDim }]} numberOfLines={1}>
-            {quickPayer ? (quickPayer === myName ? 'Me' : quickPayer) : 'Payer'}
-          </Text>
-        </PressBtn>
-        <PressBtn onPress={handleQuickSave} disabled={!canSaveQuick} hitSlop={8} noShadow>
-          <CheckCircleIcon size={19} color={canSaveQuick ? C.text : C.textDim} filled={canSaveQuick} fillColor={C.yellow} />
-        </PressBtn>
-        <Dropdown visible={quickPayerDropOpen} position={quickPayerDropPos} onClose={() => setQuickPayerDropOpen(false)} style={{ minWidth: 150 }}>
-          {homePeople.map((name, i) => (
-            <DropdownRow
-              key={name}
-              onPress={() => { selectionHaptic(); setQuickPayer(name); setQuickPayerDropOpen(false); }}
-              divider={i > 0}
-              trailing={quickPayer === name ? <CheckCircleIcon size={15} color={C.text} filled fillColor={C.yellow} /> : undefined}
-            >
-              <Text style={s.scopeDropItemText}>{name === myName ? `${name} (me)` : name}</Text>
-            </DropdownRow>
-          ))}
-        </Dropdown>
-      </View>
 
-      {/* Footer */}
-      <View style={s.footer}>
-        <Button
-          variant="primary"
-          size="big"
-          label="Add"
-          icon={<PlusIcon color={C.text} size={20} />}
-          disabled={quickAddStarted}
-          onPress={() => { mediumHaptic(); setAddSheetVisible(true); }}
-        />
-      </View>
+      <GroupActionsMenu
+        visible={actionsMenu}
+        onDismiss={() => setActionsMenu(false)}
+        closeLabel="Close home"
+        closed={home.status === 'closed'}
+        onEdit={() => { requestGroupEdit(home.id); router.back(); }}
+        onShare={() => setShareModal(true)}
+        onCloseGroup={() => closeHome(home.id)}
+        onReopen={() => reopenHome(home.id)}
+        onDelete={() => setDeleteConfirm(true)}
+      />
+      <ShareCodeModal
+        visible={shareModal}
+        onClose={() => setShareModal(false)}
+        title="Share home"
+        code={home.joinCode}
+        message={`Join my home "${home.name}" on Tab Rat! Code: ${home.joinCode}`}
+      />
+      <ConfirmModal
+        visible={deleteConfirm}
+        onClose={() => setDeleteConfirm(false)}
+        onConfirm={() => { mediumHaptic(); setDeleteConfirm(false); deleteHome(home.id); router.dismiss(2); }}
+        title={`Delete ${home.name}?`}
+        body="This will remove the home and all its expenses. This cannot be undone."
+        confirmLabel="Delete"
+        confirmVariant="destructive"
+      />
+
+      <QuickAddBar people={homePeople} myName={myName} currency="USD" onSave={handleQuickSave}
+        addLabel="Add" onAdd={() => { mediumHaptic(); setAddSheetVisible(true); }} footerStyle={s.footer} />
 
       <AddExpenseModal
         visible={addVisible}
@@ -801,7 +720,7 @@ export default function HomeExpensesScreen() {
           {[
             { label: 'Expense', desc: 'Log a single cost without a receipt', badgeBg: AVATAR_PALETTE[4].bg, color: AVATAR_PALETTE[4].text, Icon: ExpenseIcon, onPress: () => { setAddSheetVisible(false); setAddVisible(true); } },
             { label: 'Bill', desc: 'Scan or upload a new receipt to split', badgeBg: C.billBg, color: C.billFg, Icon: BillTypeIcon, onPress: () => { setAddSheetVisible(false); startHomeEntry(home.id); router.push('/upload'); } },
-            { label: 'Link Bill', desc: 'Connect a bill you already split to this home', badgeBg: AVATAR_PALETTE[3].bg, color: AVATAR_PALETTE[3].text, Icon: LinkIcon, onPress: () => { setAddSheetVisible(false); setImportVisible(true); } },
+            { label: 'Link bill', desc: 'Connect a bill you already split to this home', badgeBg: AVATAR_PALETTE[3].bg, color: AVATAR_PALETTE[3].text, Icon: LinkIcon, onPress: () => { setAddSheetVisible(false); setImportVisible(true); } },
           ].map((a) => (
             <Card key={a.label} style={s.sheetOption} onPress={a.onPress} pressBorderColor={a.badgeBg}>
               <IconBadge bg={a.badgeBg}>
@@ -861,9 +780,7 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   scrollContent: { paddingBottom: 24 },
 
-  expHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 16, paddingTop: 14 },
-  monthNavGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  monthNavLabel: { ...Type.sectionLabel, letterSpacing: 0.6, textTransform: 'uppercase', color: C.text },
+  expHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 10, paddingHorizontal: 16, paddingTop: 14 },
 
   scopeDrop: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
   scopeDropText: { ...Type.pillLabel, color: C.text },
@@ -871,7 +788,7 @@ const s = StyleSheet.create({
 
   section: { paddingHorizontal: 16, paddingTop: 4 },
   emptySection: { alignItems: 'center', paddingVertical: 40 },
-  emptySectionText: { ...Type.cardDesc, color: C.textDim, textAlign: 'center' },
+  emptySectionText: { ...Type.note, color: C.textDim, textAlign: 'center' },
 
   // Day strip
   dayPickerRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginBottom: 12 },
@@ -903,23 +820,6 @@ const s = StyleSheet.create({
 
   footer: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.border },
 
-  quickAddRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginHorizontal: 16, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 8,
-    backgroundColor: C.bg, borderRadius: 14,
-    boxShadow: '0px 4px 12px rgba(0,0,0,0.12)', elevation: 6,
-  },
-  quickAddFieldActive: { borderColor: C.text },
-  quickAddNameCard: { flex: 1, height: InputMetrics.height, justifyContent: 'center', borderWidth: 1.5, borderColor: C.border },
-  quickAddNameInput: { ...Type.labelMedium, color: C.text, paddingHorizontal: 12 },
-  quickAddAmountCard: { width: 66, height: InputMetrics.height, justifyContent: 'center', borderWidth: 1.5, borderColor: C.border },
-  quickAddAmountInner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 2 },
-  quickAddAmountInput: { flex: 1, minWidth: 0, ...Type.pillLabel, color: C.text, padding: 0 },
-  quickAddPayerBtn: {
-    width: 62, height: InputMetrics.height, alignItems: 'center', justifyContent: 'center',
-    borderRadius: InputMetrics.radius, backgroundColor: C.card, borderWidth: 1.5, borderColor: C.border,
-  },
-  quickAddPayerText: { fontFamily: 'Poppins_500Medium', fontSize: 12, color: C.text },
 
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },

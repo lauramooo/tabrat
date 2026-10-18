@@ -1,14 +1,12 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PressBtn } from '@/components/PressBtn';
 import { Animated, StyleSheet, View } from 'react-native';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { toSentenceCase } from '@/utils/text';
 
-export function ActionPill({ progress, icon, iconNode, label, color, textColor = C.text, onPress }: {
+export function ActionPill({ progress, iconNode, label, color, textColor = C.text, onPress }: {
   progress: Animated.AnimatedInterpolation<number>;
-  icon?: string;
-  iconNode?: (color: string) => React.ReactNode;
+  iconNode: (color: string) => React.ReactNode;
   label: string;
   color: string;
   textColor?: string;
@@ -23,7 +21,7 @@ export function ActionPill({ progress, icon, iconNode, label, color, textColor =
   return (
     <PressBtn style={s.wrap} onPress={onPress} activeOpacity={0.85} hitSlop={4}>
       <View style={[s.pill, { backgroundColor: color }]}>
-        {iconNode ? iconNode(textColor) : <MaterialCommunityIcons name={icon as any} size={15} color={textColor} />}
+        {iconNode(textColor)}
         <Animated.Text style={[s.label, { opacity: textOp, color: textColor }]}>{toSentenceCase(label)}</Animated.Text>
       </View>
     </PressBtn>

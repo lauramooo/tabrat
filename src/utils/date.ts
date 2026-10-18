@@ -3,10 +3,21 @@
 // timezone behind UTC, which silently drops date-only values into the wrong month. Parse those
 // as local-midnight instead; anything with a time/offset (e.g. a real ISO timestamp) is left to
 // the normal parser since it already carries real UTC information worth converting.
+//
+// The app's own display format ("Oct 20, 2026", or "Oct. 20, 2026") is parsed by hand too: the
+// phone's JS engine (Hermes) returns Invalid Date for it, even though every desktop browser reads
+// it — so a date picked on the phone silently came out blank while the same flow worked on web.
+const MONTH_INDEX: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
 export function parseLocalDate(d: Date | string): Date {
   if (typeof d !== 'string') return d;
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
   if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const named = /^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(d.trim());
+  if (named && MONTH_INDEX[named[1].toLowerCase()] !== undefined) {
+    return new Date(Number(named[3]), MONTH_INDEX[named[1].toLowerCase()], Number(named[2]));
+  }
   return new Date(d);
 }
 

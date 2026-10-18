@@ -1,4 +1,3 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { PressBtn } from '@/components/PressBtn';
 import { PencilIcon, PlusIcon, TrashIcon, UserMultipleIcon } from '@/components/FigmaIcons';
@@ -37,10 +36,10 @@ const DEFAULT_GROUP_ICON = '👥';
 // screen's swipe-reveal animation.
 
 function ActionPill({
-  progress, icon, iconNode, label, color, textColor = C.text, onPress,
+  progress, iconNode, label, color, textColor = C.text, onPress,
 }: {
   progress: Animated.AnimatedInterpolation<number>;
-  icon?: string; iconNode?: React.ReactNode; label: string; color: string; textColor?: string; onPress: () => void;
+  iconNode: React.ReactNode; label: string; color: string; textColor?: string; onPress: () => void;
 }) {
   // Swipeable's `progress` is driven by the native animation driver, which doesn't support
   // animating `width` (see shared @/components/ActionPill for the same fix) — the pill is
@@ -49,7 +48,7 @@ function ActionPill({
   return (
     <PressBtn style={s.actionWrap} onPress={onPress} activeOpacity={0.85}>
       <View style={[s.actionPill, { backgroundColor: color }]}>
-        {iconNode ?? <MaterialCommunityIcons name={icon as any} size={15} color={textColor} />}
+        {iconNode}
         <Animated.Text style={[s.actionLabel, { opacity: textOp, color: textColor }]}>{toSentenceCase(label)}</Animated.Text>
       </View>
     </PressBtn>

@@ -6,6 +6,9 @@ export interface ReceiptItem {
   assignedTo: string[];
   category?: string;   // e.g. 'Drinks' | 'Apps' | 'Dessert' — used to filter the Assign screen
   modifiers?: string[]; // sides/sauces/customizations printed under this item on the receipt
+  // Separate line items the user folded into this one ("Add to another item"), kept whole so each
+  // can be separated back out. Their prices are already included in `price` above.
+  extras?: ReceiptItem[];
 }
 
 // One of possibly several people who paid the bill, with how much each paid.
@@ -97,6 +100,7 @@ export interface SplitRecord {
   date: string;
   restaurantName?: string;
   receiptDate?: string;
+  receiptEndDate?: string;         // trip/home expense spanning several days; unset = single day
   total: number;
   people: string[];
   itemCount: number;
