@@ -10,6 +10,7 @@ import { Button, Card, CenteredModal, CircleIconButton, DateRangeField, Dropdown
 import { CameraIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, GiftIcon, PencilIcon, PlusCircleIcon, SearchIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
+import { Avatar } from '@/components/Avatar';
 import { PersonChip } from '@/components/PersonChip';
 import { InputMetrics, Radius } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
@@ -452,7 +453,7 @@ export default function ManualEntryScreen() {
             <>
               <PressBtn style={s.giftToggle} onPress={() => { selectionHaptic(); if (giftOpen) { setCovered([]); setCoveredBy([]); } setGiftOpen(!giftOpen); }} activeOpacity={0.7} noShadow>
                 <GiftIcon size={14} color={C.textSub} />
-                <Text style={s.giftToggleText}>Was any of this a gift?</Text>
+                <Text style={s.giftToggleText}>WAS ANY OF THIS A GIFT?</Text>
                 {giftOpen ? <ChevronUpCircleIcon size={15} color={C.textSub} /> : <ChevronDownCircleIcon size={15} color={C.textSub} />}
               </PressBtn>
               {giftOpen && (
@@ -473,13 +474,25 @@ export default function ManualEntryScreen() {
                         ))}
                       </View>
                       {amount > 0 && coveredBy.length > 0 && (
-                        <View style={s.perDayBanner}>
-                          {splitWithGifts(amount, participants, covered, coveredBy).map(({ name, amount: owed }, i) => (
-                            <Text key={name} style={s.perDayItem}>
-                              {i > 0 ? '·  ' : ''}{name} <Text style={s.perDayVal}>{covered.includes(name) ? 'gift' : fmt(owed, expenseCurrency)}</Text>
-                            </Text>
-                          ))}
-                        </View>
+                        <>
+                          <FieldLabel style={{ marginTop: 16 }}>WHAT EVERYONE PAYS</FieldLabel>
+                          <View style={s.giftList}>
+                            {splitWithGifts(amount, participants, covered, coveredBy).map(({ name, amount: owed }) => (
+                              <View key={name} style={s.giftRow}>
+                                <Avatar name={name} index={tripPeople.indexOf(name)} size={26} />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={s.giftName}>{name}</Text>
+                                  {coveredBy.includes(name) && (
+                                    <Text style={s.giftNote} numberOfLines={1}>{`covering ${covered.join(' & ')}`}</Text>
+                                  )}
+                                </View>
+                                {covered.includes(name)
+                                  ? <GiftIcon size={16} color={C.text} />
+                                  : <Text style={s.giftAmount}>{fmt(owed, expenseCurrency)}</Text>}
+                              </View>
+                            ))}
+                          </View>
+                        </>
                       )}
                     </>
                   )}
@@ -682,7 +695,12 @@ const s = StyleSheet.create({
 
   noParticipantsNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 16, paddingHorizontal: 4 },
   giftToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 16, paddingVertical: 4 },
-  giftToggleText: { ...Type.cardDesc, color: C.textSub, textDecorationLine: 'underline' },
+  giftToggleText: { ...Type.fieldLabel, color: C.textSub },
+  giftList: { backgroundColor: C.card, borderRadius: 10, paddingVertical: 4, paddingHorizontal: 12 },
+  giftRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  giftName: { ...Type.bodySmall, color: C.text },
+  giftNote: { ...Type.caption, color: C.textSub },
+  giftAmount: { ...Type.bodySmall, fontFamily: 'Poppins_700Bold', color: C.text },
   hintText: { ...Type.cardDesc, color: C.textSub, marginBottom: 8 },
   noParticipantsText: { flex: 1, ...Type.cardDesc, color: C.textDim, lineHeight: 18 },
 
