@@ -13,7 +13,7 @@ import { GroupHeader, HeaderMonthPicker } from '@/components/GroupHeader';
 import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
 import { takeGroupEditRequest } from '@/utils/pendingGroupEdit';
 import { QuickAddBar } from '@/components/QuickAddBar';
-import { Button, Card, EmptyHint, EmptyPie, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, DatePickerModal, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, Input, PayModal, RunningTotalsCard, SectionLabel, SettlementRow, ModalBackdrop, KeyboardAwareScrollView } from '@/components/design';
+import { Button, Card, EmptyHint, EmptyPie, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, DatePickerModal, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, Input, PayModal, RunningTotalsCard, SectionLabel, SettlementRow, ModalBackdrop, KeyboardAwareScrollView, MissingPayerNotice } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
@@ -678,6 +678,11 @@ export default function HomeDetailScreen() {
                 <EmptyHint text="Nothing here yet" />
               </View>
             )}
+
+            <MissingPayerNotice
+              expenses={monthExpenses.filter((e) => !e.paidByName)}
+              onOpen={(e) => { useSplitStore.getState().loadSplit(e, true); router.push('/summary'); }}
+            />
 
             {/* WHO OWES WHO */}
             {visibleSettlement.length > 0 && (

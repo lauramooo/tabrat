@@ -15,7 +15,7 @@ import { GroupHeader } from '@/components/GroupHeader';
 import { GroupActionsButton, GroupActionsMenu } from '@/components/GroupActionsMenu';
 import { takeGroupEditRequest } from '@/utils/pendingGroupEdit';
 import { QuickAddBar } from '@/components/QuickAddBar';
-import { Button, Card, EmptyHint, EmptyPie, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, CurrencyPickerList, DateRangeField, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, IconBadge, Input, PayModal, RunningTotalsCard, SearchInput, SettlementRow, KeyboardAwareScrollView, DROPDOWN_REVEAL } from '@/components/design';
+import { Button, Card, EmptyHint, EmptyPie, CenteredModal, CircleIconButton, ClosedSettlementRow, ConfirmModal, CurrencyPickerList, DateRangeField, Divider, Dropdown, DropdownRow, EditableTitle, FieldLabel, IconBadge, Input, PayModal, RunningTotalsCard, SearchInput, SettlementRow, KeyboardAwareScrollView, DROPDOWN_REVEAL, MissingPayerNotice } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
@@ -847,6 +847,18 @@ export default function TripDetailScreen() {
             </View>
           </View>
         )}
+
+        <MissingPayerNotice
+          expenses={tabs.filter((t) => !t.paidByName)}
+          onOpen={(e) => {
+            if (e.source === 'manual') {
+              router.push({ pathname: '/trip/manual-entry' as any, params: { tripId: id!, expenseId: e.id, direct: 'true' } });
+            } else {
+              useSplitStore.getState().loadSplit(e, true);
+              router.push('/summary');
+            }
+          }}
+        />
 
         {/* ── Dashboard: Who owes who (always, not filtered by person) ── */}
         {visibleSettlement.length > 0 && (

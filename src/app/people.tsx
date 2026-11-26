@@ -19,7 +19,7 @@ import { Text } from '@/components/design/Text';
 
 export default function PeopleScreen() {
   const router = useRouter();
-  const { people, groups, friends, addPerson, removePerson } = useSplitStore();
+  const { people, groups, friends, addPerson, removePerson, paidBy, setPaidBy } = useSplitStore();
   const [friendSearch, setFriendSearch] = useState('');
   const [friendDropOpen, setFriendDropOpen] = useState(false);
   const [addPressed, setAddPressed] = useState(false);
@@ -42,6 +42,14 @@ export default function PeopleScreen() {
     };
     load();
   }, []);
+
+  // Whoever is splitting the bill most likely paid it — default the payer to them (changeable on
+  // the summary). A bill with no payer is left out of a trip's/home's "who owes who" entirely.
+  useEffect(() => {
+    if (paidBy || !myName) return;
+    const me = people.find((p) => p.name.toLowerCase() === myName.toLowerCase());
+    if (me) setPaidBy(me.id);
+  }, [people, myName, paidBy]);
 
   const handleAdd = (nameToAdd?: string) => {
     const trimmed = (nameToAdd ?? friendSearch).trim();

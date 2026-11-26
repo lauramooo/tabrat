@@ -23,6 +23,7 @@ export { RunningTotalsCard } from './RunningTotalsCard';
 export { SettlementRow } from './SettlementRow';
 export { ClosedSettlementRow } from './ClosedSettlementRow';
 export { PayModal } from './PayModal';
+export { MissingPayerNotice } from './MissingPayerNotice';
 export { GroupTabs } from './GroupTabs';
 export type { GroupTab } from './GroupTabs';
 export { EmptyHint, EmptyPie } from './EmptyHint';
