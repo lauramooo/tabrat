@@ -459,7 +459,6 @@ export default function ManualEntryScreen() {
               {giftOpen && (
                 <>
                   <FieldLabel style={{ marginTop: 12 }}>{"WHO'S BEING TREATED?"}</FieldLabel>
-                  <Text style={s.hintText}>{"They won't owe anything."}</Text>
                   <View style={s.chipsWrap}>
                     {participants.map((name) => (
                       <PersonChip key={name} name={name} index={tripPeople.indexOf(name)} selected={covered.includes(name)} onPress={() => toggleCovered(name)} />
@@ -701,7 +700,6 @@ const s = StyleSheet.create({
   giftName: { ...Type.bodySmall, color: C.text },
   giftNote: { ...Type.caption, color: C.textSub },
   giftAmount: { ...Type.bodySmall, fontFamily: 'Poppins_700Bold', color: C.text },
-  hintText: { ...Type.cardDesc, color: C.textSub, marginBottom: 8 },
   noParticipantsText: { flex: 1, ...Type.cardDesc, color: C.textDim, lineHeight: 18 },
 
   // Footer
