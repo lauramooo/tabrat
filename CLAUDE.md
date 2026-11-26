@@ -23,6 +23,15 @@ npx tsc --noEmit        # type-check — a stable set of ~12 pre-existing errors
 
 There is no test suite configured in this project.
 
+### Shipping
+
+```bash
+npx eas-cli build --platform ios --profile production --auto-submit   # new build → TestFlight (needed for native changes)
+npx eas-cli update --channel production --environment production --message "…"  # JS-only fix → installed builds, no review
+```
+
+`runtimeVersion` uses the `fingerprint` policy, so an update only reaches builds whose native code matches; anything touching native config (app.json ios/android settings, new native packages) needs a build. External TestFlight testers ("family and friends") only get a new build after it's added to that group in App Store Connect.
+
 ## Architecture
 
 This is a receipt-splitting app with three parallel expense contexts, all sharing the same underlying split/calculation engine:
