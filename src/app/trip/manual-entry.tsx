@@ -7,7 +7,7 @@ import { ActionSheetIOS, Alert, Platform, Pressable } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, CenteredModal, CircleIconButton, DateRangeField, Dropdown, DropdownRow, FieldLabel, Input, KeyboardAwareScrollView } from '@/components/design';
-import { CameraIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, PencilIcon, PlusCircleIcon, SearchIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
+import { CameraIcon, CheckCircleIcon, ChevronDownCircleIcon, ChevronUpCircleIcon, CloseCircleIcon, GiftIcon, PencilIcon, PlusCircleIcon, SearchIcon, TrashIcon, XMarkIcon } from '@/components/FigmaIcons';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
 import { PersonChip } from '@/components/PersonChip';
@@ -451,6 +451,7 @@ export default function ManualEntryScreen() {
           {participants.length > 1 && (
             <>
               <PressBtn style={s.giftToggle} onPress={() => { selectionHaptic(); if (giftOpen) { setCovered([]); setCoveredBy([]); } setGiftOpen(!giftOpen); }} activeOpacity={0.7} noShadow>
+                <GiftIcon size={14} color={C.textSub} />
                 <Text style={s.giftToggleText}>Was any of this a gift?</Text>
                 {giftOpen ? <ChevronUpCircleIcon size={15} color={C.textSub} /> : <ChevronDownCircleIcon size={15} color={C.textSub} />}
               </PressBtn>

@@ -203,6 +203,19 @@ export function PencilIcon({ color = '#141B34', size = 14 }: { color?: string; s
   );
 }
 
+export function GiftIcon({ color = '#141B34', size = 14 }: { color?: string; size?: number }) {
+  const { width, height } = sizeFor(14, 15, size);
+  return (
+    <Svg width={width} height={height} viewBox="0 0 14 15" fill="none">
+      <Path d="M1.31641 6.65002V9.31669C1.31641 11.5166 1.31641 12.6165 1.99983 13.3C2.68324 13.9834 3.78319 13.9834 5.98307 13.9834H7.31641C9.51627 13.9834 10.6162 13.9834 11.2997 13.3C11.9831 12.6165 11.9831 11.5166 11.9831 9.31669V6.65002" stroke={color} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M0.649902 5.31673C0.649902 4.81827 0.649902 4.56904 0.783876 4.3834C0.871642 4.26179 0.997882 4.16079 1.1499 4.09058C1.38196 3.9834 1.69349 3.9834 2.31657 3.9834H10.9832C11.6063 3.9834 11.9178 3.9834 12.1499 4.09058C12.3019 4.16079 12.4282 4.26179 12.5159 4.3834C12.6499 4.56904 12.6499 4.81827 12.6499 5.31673C12.6499 5.81519 12.6499 6.0644 12.5159 6.25006C12.4282 6.37166 12.3019 6.47266 12.1499 6.54286C11.9178 6.65006 11.6063 6.65006 10.9832 6.65006H2.31657C1.69349 6.65006 1.38196 6.65006 1.1499 6.54286C0.997882 6.47266 0.871642 6.37166 0.783876 6.25006C0.649902 6.0644 0.649902 5.81519 0.649902 5.31673Z" stroke={color} strokeWidth={1.3} strokeLinejoin="round" />
+      <Path d="M2.6499 1.8405C2.6499 1.18302 3.1829 0.650024 3.84038 0.650024H4.07848C5.49864 0.650024 6.6499 1.80129 6.6499 3.22145V3.98336H4.79276C3.60929 3.98336 2.6499 3.02396 2.6499 1.8405Z" stroke={color} strokeWidth={1.3} strokeLinejoin="round" />
+      <Path d="M10.6499 1.8405C10.6499 1.18302 10.1169 0.650024 9.45944 0.650024H9.2213C7.80117 0.650024 6.6499 1.80129 6.6499 3.22145V3.98336H8.50704C9.6905 3.98336 10.6499 3.02396 10.6499 1.8405Z" stroke={color} strokeWidth={1.3} strokeLinejoin="round" />
+      <Path d="M6.6499 6.65002V13.9834" stroke={color} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function ExpenseIcon({ color = '#141B34', size = 22 }: { color?: string; size?: number }) {
   const { width, height } = sizeFor(12, 15, size);
   return (
