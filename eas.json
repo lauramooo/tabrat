@@ -38,7 +38,8 @@
     "production": {
       "ios": {
         "appleId": "123thisismyusername@gmail.com",
-        "appleTeamId": "96CARA94CX"
+        "appleTeamId": "96CARA94CX",
+        "ascAppId": "6819115805"
       },
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",
