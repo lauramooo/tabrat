@@ -125,6 +125,32 @@ function ShareCardContent({ splits, total, restaurantName, date, mode, colorOffs
   );
 }
 
+type ShareMode = 'short' | 'full';
+
+// Gives up on an image after this long and falls back to sharing text, rather than leaving the
+// sheet on "Generating preview…" forever.
+const CAPTURE_TIMEOUT_MS = 12000;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timed out')), ms);
+    p.then((v) => { clearTimeout(timer); resolve(v); }, (e) => { clearTimeout(timer); reject(e); });
+  });
+}
+
+// Plain-text version of the share card — the fallback when the image can't be made.
+function splitsAsText(splits: PersonSplit[], total: number, mode: ShareMode, restaurantName?: string, date?: string) {
+  const header = [restaurantName || 'Bill summary', date ? fmtDate(date) || date : ''].filter(Boolean).join(' — ');
+  const people = splits.map((s) => {
+    const line = `${s.person.name}: ${fmt(s.total)}`;
+    if (mode === 'short' || s.itemShares.length === 0) return line;
+    const items = s.itemShares.map(({ item, share }) => `  • ${item.name} ${fmt(share)}`);
+    const extras = [s.taxShare > 0 ? `  • Tax ${fmt(s.taxShare)}` : '', s.tipShare > 0 ? `  • Tip ${fmt(s.tipShare)}` : ''].filter(Boolean);
+    return [line, ...items, ...extras].join('\n');
+  });
+  return [header, '', ...people, '', `Total: ${fmt(total)}`].join('\n');
+}
+
 function ShareImageModal({ splits, total, restaurantName, date, colorOffset, joinCode, onClose }: {
   splits: PersonSplit[];
   total: number;
@@ -135,25 +161,52 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, joi
   onClose: () => void;
 }) {
   const isSinglePerson = splits.length === 1;
-  const [mode, setMode] = useState<'short' | 'full'>(isSinglePerson ? 'full' : 'short');
-  const cardRef = useRef<View>(null);
-  const [previewUri, setPreviewUri] = useState<string | null>(null);
-  const [imgRatio, setImgRatio] = useState(1.4);
+  const [mode, setMode] = useState<ShareMode>(isSinglePerson ? 'full' : 'short');
+  // Both versions are rendered off-screen and captured once each (short first, since it's the
+  // default), so switching Short/Full is instant instead of regenerating every time.
+  const shortRef = useRef<View>(null);
+  const fullRef = useRef<View>(null);
+  const [cardSize, setCardSize] = useState<Partial<Record<ShareMode, { w: number; h: number }>>>({});
+  const [shots, setShots] = useState<Partial<Record<ShareMode, string>>>({});
+  const [failed, setFailed] = useState<Partial<Record<ShareMode, boolean>>>({});
   const [codeCopied, setCodeCopied] = useState(false);
+  const capturing = useRef<Partial<Record<ShareMode, boolean>>>({});
 
-  const capture = async () => {
-    setPreviewUri(null);
-    await new Promise((r) => setTimeout(r, 200));
+  const capture = async (m: ShareMode) => {
+    const ref = m === 'short' ? shortRef : fullRef;
+    if (capturing.current[m] || !ref.current) return;
+    capturing.current[m] = true;
     try {
-      const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
-      Image.getSize(uri, (w, h) => { if (w && h) setImgRatio(w / h); }, (e) => console.log('[summary] getSize failed:', e));
-      setPreviewUri(uri);
+      // Let the freshly laid-out card actually draw before snapshotting it.
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      // renderInContext: the default snapshot method silently fails (or comes back blank) on
+      // large off-screen views — exactly the tall card a big group makes.
+      const uri = await withTimeout(
+        captureRef(ref, { format: 'png', quality: 1, result: 'tmpfile', useRenderInContext: true }),
+        CAPTURE_TIMEOUT_MS,
+      );
+      setShots((s) => ({ ...s, [m]: uri }));
     } catch (e) {
       console.log('[summary] captureRef failed:', e);
+      setFailed((f) => ({ ...f, [m]: true }));
     }
   };
 
-  useEffect(() => { capture(); }, [mode]);
+  // Capture once each card has laid out: the current mode first, then the other in the background.
+  useEffect(() => {
+    if (cardSize[mode] && !shots[mode] && !failed[mode]) { capture(mode); return; }
+    const other: ShareMode = mode === 'short' ? 'full' : 'short';
+    if (!isSinglePerson && cardSize[other] && !shots[other] && !failed[other]) capture(other);
+  }, [cardSize, shots, failed, mode]);
+
+  const onCardLayout = (m: ShareMode) => (e: { nativeEvent: { layout: { width: number; height: number } } }) => {
+    const { width: w, height: h } = e.nativeEvent.layout;
+    if (w > 0 && h > 0 && !cardSize[m]) setCardSize((s) => ({ ...s, [m]: { w, h } }));
+  };
+
+  const previewUri = shots[mode];
+  const size = cardSize[mode];
+  const imgRatio = size ? size.w / size.h : 1.4;
 
   const handleShareCode = async () => {
     if (!joinCode) return;
@@ -165,35 +218,38 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, joi
     }
   };
 
+  const shareAsText = () => Share.share({ message: splitsAsText(splits, total, mode, restaurantName, date) });
+
   const doShare = async () => {
     mediumHaptic();
-    const uri = previewUri ?? await captureRef(cardRef, { format: 'png', quality: 1 });
+    if (!previewUri) { await shareAsText(); return; }
     if (Platform.OS === 'web') {
       const a = document.createElement('a');
-      a.href = uri;
+      a.href = previewUri;
       a.download = 'bill-summary.png';
       a.click();
       return;
     }
     try {
-      await Share.share({ url: uri });
+      await Share.share({ url: previewUri });
     } catch {
-      const lines = splits.map((s) => `${s.person.name}: ${fmt(s.total)}`).join('\n');
-      await Share.share({ message: `Bill Summary\n${lines}\nTotal: ${fmt(total)}` });
+      await shareAsText();
     }
   };
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      {/* Off-screen capture target */}
+      {/* Off-screen capture targets, one per mode */}
       <View style={{ position: 'absolute', left: -9999, top: 0, width: 360, backgroundColor: C.bg }}>
-        <View ref={cardRef} collapsable={false}>
-          <ReceiptZigzagEdge />
-          <View style={[st.shareCard, { borderRadius: 0 }]}>
-            <ShareCardContent splits={splits} total={total} restaurantName={restaurantName} date={date} mode={mode} colorOffset={colorOffset} joinCode={joinCode} />
+        {(isSinglePerson ? (['full'] as const) : (['short', 'full'] as const)).map((m) => (
+          <View key={m} ref={m === 'short' ? shortRef : fullRef} collapsable={false} onLayout={onCardLayout(m)}>
+            <ReceiptZigzagEdge />
+            <View style={[st.shareCard, { borderRadius: 0 }]}>
+              <ShareCardContent splits={splits} total={total} restaurantName={restaurantName} date={date} mode={m} colorOffset={colorOffset} joinCode={joinCode} />
+            </View>
+            <ReceiptZigzagEdge flip />
           </View>
-          <ReceiptZigzagEdge flip />
-        </View>
+        ))}
       </View>
 
       <ModalBackdrop style={st.modalBackdrop} onPress={onClose}>
@@ -224,7 +280,9 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, joi
               />
             ) : (
               <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-                <Text style={{ color: C.textSub, fontFamily: 'Poppins_400Regular' }}>Generating preview…</Text>
+                <Text style={{ color: C.textSub, fontFamily: 'Poppins_400Regular', textAlign: 'center' }}>
+                  {failed[mode] ? "Couldn't make the image — Share will send the split as text instead." : 'Generating preview…'}
+                </Text>
               </View>
             )}
           </ScrollView>
@@ -240,9 +298,10 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, joi
           <Button
             variant="primary"
             size="small"
-            label="Share Image"
+            label={failed[mode] && !previewUri ? 'Share as text' : 'Share image'}
             icon={<SendIcon color={C.text} size={17} />}
             onPress={doShare}
+            disabled={!previewUri && !failed[mode]}
             style={{ alignSelf: 'flex-end' }}
           />
         </Pressable>
