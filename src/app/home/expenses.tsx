@@ -386,15 +386,9 @@ export default function HomeExpensesScreen() {
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
     [],
   );
-  const [selectedDayISO, setSelectedDayISO] = useState<string | null>(() =>
-    (now.getFullYear() === viewYear && now.getMonth() === viewMonth) ? todayISO : null,
-  );
-  const isFirstMonthRender = useRef(true);
-  useEffect(() => {
-    if (isFirstMonthRender.current) { isFirstMonthRender.current = false; return; }
-    const n = new Date();
-    setSelectedDayISO((n.getFullYear() === viewYear && n.getMonth() === viewMonth) ? todayISO : null);
-  }, [viewYear, viewMonth]);
+  // Always opens on "All" (null) — including after switching months — rather than jumping to today.
+  const [selectedDayISO, setSelectedDayISO] = useState<string | null>(null);
+  useEffect(() => { setSelectedDayISO(null); }, [viewYear, viewMonth]);
   const dayScrollRef = useRef<FlatList<any>>(null);
   const [dayStripW, setDayStripW] = useState(0);
 

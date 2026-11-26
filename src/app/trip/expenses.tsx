@@ -241,16 +241,8 @@ export default function TripExpensesScreen() {
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [myName, setMyName] = useState('');
   const [quickEditTab, setQuickEditTab] = useState<SplitRecord | null>(null);
-  const [selectedDayISO, setSelectedDayISO] = useState<string | null>(() => {
-    const t = trips.find((tr) => tr.id === tripId);
-    if (!t?.startDate) return null;
-    const toMidnight = (d: Date) => { const c = new Date(d); c.setHours(0, 0, 0, 0); return c; };
-    const start = toMidnight(parseDisplay(t.startDate));
-    const end = toMidnight(t.endDate ? parseDisplay(t.endDate) : start);
-    const today = toMidnight(new Date());
-    if (today < start || today > end) return null;
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  });
+  // Always opens on "All" (null) rather than jumping to today's date.
+  const [selectedDayISO, setSelectedDayISO] = useState<string | null>(null);
   const [actionsMenu, setActionsMenu] = useState(false);
   const [shareModal, setShareModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
