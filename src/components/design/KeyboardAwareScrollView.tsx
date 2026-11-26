@@ -93,8 +93,11 @@ export const KeyboardAwareScrollView = forwardRef<ScrollView, Props>(
       >
         <View ref={contentRef} collapsable={false} style={contentContainerStyle}>
           {children}
+          {/* Inside the content, not after it: a sibling spacer would sit above anything that
+              overflows the content's bottom edge — like an inline search dropdown — and swallow
+              its taps. pointerEvents none so it never takes a touch either way. */}
+          {bottomPad > 0 && <View style={{ height: bottomPad }} pointerEvents="none" />}
         </View>
-        {bottomPad > 0 && <View style={{ height: bottomPad }} />}
       </Container>
     );
   },
