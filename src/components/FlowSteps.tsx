@@ -17,6 +17,7 @@ import { fmtDate, parseLocalDate } from '@/utils/date';
 import { resolveReceiptUri } from '@/utils/receiptImage';
 import { selectionHaptic, lightHaptic } from '@/utils/haptics';
 import { Text, TextInput } from '@/components/design/Text';
+import { joinInviteMessage } from '@/utils/joinCode';
 
 let DateTimePicker: any = null;
 if (Platform.OS !== 'web') {
@@ -180,7 +181,7 @@ export function BillHeader() {
         onClose={() => setShareCodeVisible(false)}
         title="Share bill"
         code={joinCode}
-        message={`Join my bill split on Tab Rat! Code: ${joinCode}`}
+        message={joinInviteMessage('bill', joinCode ?? '')}
       />
 
       {/* Edit bill modal */}

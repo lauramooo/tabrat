@@ -8,6 +8,7 @@ import {
   Poppins_900Black,
 } from '@expo-google-fonts/poppins';
 import { useFonts } from 'expo-font';
+import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -91,6 +92,18 @@ export default function RootLayout() {
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | undefined>(undefined);
   const [welcomeSeen, setWelcomeSeen] = useState<boolean | undefined>(undefined);
   const justSignedIn = useRef(false);
+  // A tap-to-join link (tabrat://join/<code>) opened while signed out: remembered here so the
+  // join happens right after sign-in/onboarding instead of being dropped for the Feed.
+  const pendingJoinCode = useRef<string | null>(null);
+  const openedUrl = Linking.useURL();
+  useEffect(() => {
+    if (!openedUrl) return;
+    // tabrat://join/123456 parses as host "join" + path "123456"; a dev (exp://…/--/join/123456)
+    // link has it all in the path — joining the two covers both.
+    const { hostname, path } = Linking.parse(openedUrl);
+    const m = /(?:^|\/)join\/(\d{6})$/.exec([hostname, path].filter(Boolean).join('/'));
+    if (m) pendingJoinCode.current = m[1];
+  }, [openedUrl]);
 
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
@@ -132,7 +145,10 @@ export default function RootLayout() {
   useEffect(() => {
     if (session && needsOnboarding === false && justSignedIn.current) {
       justSignedIn.current = false;
-      router.replace('/');
+      const code = pendingJoinCode.current;
+      pendingJoinCode.current = null;
+      if (code) router.replace({ pathname: '/join/[code]', params: { code } });
+      else router.replace('/');
     }
   }, [session, needsOnboarding, router]);
 

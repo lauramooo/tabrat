@@ -22,6 +22,7 @@ import { lightHaptic, mediumHaptic, successHaptic } from '@/utils/haptics';
 import { shareText } from '@/utils/share';
 import type { Person, PersonSplit } from '@/types';
 import { Text } from '@/components/design/Text';
+import { joinInviteMessage } from '@/utils/joinCode';
 
 const PERSON_COLORS = AVATAR_PALETTE;
 
@@ -211,7 +212,7 @@ function ShareImageModal({ splits, total, restaurantName, date, colorOffset, joi
   const handleShareCode = async () => {
     if (!joinCode) return;
     mediumHaptic();
-    const didCopy = await shareText(`Join my bill split on Tab Rat! Code: ${joinCode}`);
+    const didCopy = await shareText(joinInviteMessage('bill', joinCode));
     if (didCopy) {
       setCodeCopied(true);
       setTimeout(() => setCodeCopied(false), 2000);

@@ -26,6 +26,7 @@ import { mediumHaptic, selectionHaptic, lightHaptic } from '@/utils/haptics';
 import { applyTextShortcuts } from '@/utils/text';
 import type { SplitRecord } from '@/types';
 import { Text, TextInput } from '@/components/design/Text';
+import { joinInviteMessage } from '@/utils/joinCode';
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -674,7 +675,7 @@ export default function HomeExpensesScreen() {
         onClose={() => setShareModal(false)}
         title="Share home"
         code={home.joinCode}
-        message={`Join my home "${home.name}" on Tab Rat! Code: ${home.joinCode}`}
+        message={joinInviteMessage('home', home.joinCode ?? '', home.name)}
       />
       <ConfirmModal
         visible={deleteConfirm}

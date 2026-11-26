@@ -1,22 +1,18 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native';
 import { Button, CenteredModal, FieldLabel, Input } from '@/components/design';
 import { C } from '@/constants/colors';
 import { Type } from '@/constants/typography';
-import { pullRemoteStateAndReplace } from '@/lib/authSync';
-import { joinByCode, syncUserId } from '@/lib/sync';
-import { useSplitStore } from '@/store/useSplitStore';
 import { errorMessage } from '@/utils/errors';
 import { mediumHaptic } from '@/utils/haptics';
+import { useRedeemJoinCode } from '@/utils/useRedeemJoinCode';
 import { Text } from '@/components/design/Text';
 
 // Redeems a trip/home/bill share code and jumps straight to what was joined. Shared by the Feed
 // header's "Join tab" button and the "+" FAB sheet so there's one join flow, not two.
 export function JoinCodeModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const router = useRouter();
-  const { loadSplit } = useSplitStore();
+  const redeem = useRedeemJoinCode();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,16 +24,9 @@ export function JoinCodeModal({ visible, onClose }: { visible: boolean; onClose:
     setError(null);
     setLoading(true);
     try {
-      const { kind, itemId } = await joinByCode(code.trim());
-      if (syncUserId) await pullRemoteStateAndReplace(syncUserId);
+      await redeem(code);
       mediumHaptic();
       handleClose();
-      if (kind === 'trip') router.push({ pathname: '/trip/[id]', params: { id: itemId } });
-      else if (kind === 'home') router.push({ pathname: '/home/[id]', params: { id: itemId } });
-      else {
-        const record = useSplitStore.getState().history.find((r) => r.id === itemId);
-        if (record) { loadSplit(record, true); router.push('/summary'); }
-      }
     } catch (e) {
       setError(errorMessage(e, 'Invalid code'));
     } finally {

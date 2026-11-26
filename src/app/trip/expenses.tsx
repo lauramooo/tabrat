@@ -27,6 +27,7 @@ import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import { applyTextShortcuts } from '@/utils/text';
 import type { SplitRecord } from '@/types';
 import { Text, TextInput } from '@/components/design/Text';
+import { joinInviteMessage } from '@/utils/joinCode';
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -586,7 +587,7 @@ export default function TripExpensesScreen() {
         onClose={() => setShareModal(false)}
         title="Share trip"
         code={trip.joinCode}
-        message={`Join my trip "${trip.name}" on Tab Rat! Code: ${trip.joinCode}`}
+        message={joinInviteMessage('trip', trip.joinCode ?? '', trip.name)}
       />
       <ConfirmModal
         visible={deleteConfirm}

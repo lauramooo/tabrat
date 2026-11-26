@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join on Tab Rat</title>
+<meta name="description" content="You've been invited to split expenses on Tab Rat.">
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 64px 24px 80px;
+    line-height: 1.5;
+    color: #1a1a1a;
+    background: #FFFBEF;
+    text-align: center;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { color: #eee; background: #0a0a0a; }
+    .code { background: #1c1c1c; }
+  }
+  h1 { font-size: 1.6rem; margin: 0 0 8px; }
+  p { margin: 0 0 24px; color: #606060; }
+  @media (prefers-color-scheme: dark) { p { color: #aaa; } }
+  .code {
+    font-size: 2.2rem; font-weight: 800; letter-spacing: 0.3em;
+    background: #F5F2EB; border-radius: 14px; padding: 18px 0 18px 0.3em; margin: 0 0 24px;
+  }
+  .btn {
+    display: block; padding: 16px; border-radius: 100px; border: 1.5px solid #000;
+    background: #F7D76A; color: #000; font-weight: 700; font-size: 1.1rem; text-decoration: none;
+  }
+  .small { font-size: 0.9rem; margin-top: 24px; }
+</style>
+</head>
+<body>
+<h1>Join on Tab Rat</h1>
+<p>You've been invited to split expenses. Opening Tab Rat…</p>
+<div class="code" id="code"></div>
+<a class="btn" id="open" href="#">Open in Tab Rat</a>
+<p class="small">Nothing happened? Open Tab Rat, tap <strong>Join tab</strong> on the feed, and enter the code above.</p>
+<script>
+  // Hands the invite off to the app (tabrat://join/<code>, handled by src/app/join/[code].tsx).
+  // Messaging apps only make https links tappable, which is why this page exists at all.
+  var code = (new URLSearchParams(location.search).get('code') || '').replace(/\D/g, '').slice(0, 6);
+  document.getElementById('code').textContent = code || '——';
+  var deep = 'tabrat://join/' + code;
+  document.getElementById('open').href = deep;
+  if (code) setTimeout(function () { location.href = deep; }, 250);
+</script>
+</body>
+</html>

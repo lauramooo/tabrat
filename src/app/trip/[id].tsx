@@ -30,6 +30,7 @@ import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import type { SplitRecord, Person } from '@/types';
 import { Text, TextInput } from '@/components/design/Text';
+import { joinInviteMessage } from '@/utils/joinCode';
 
 function getExpenseISODate(r: SplitRecord): string {
   if (r.receiptDate) {
@@ -1013,7 +1014,7 @@ export default function TripDetailScreen() {
         onClose={() => setShareModal(false)}
         title="Share trip"
         code={trip.joinCode}
-        message={`Join my trip "${trip.name}" on Tab Rat! Code: ${trip.joinCode}`}
+        message={joinInviteMessage('trip', trip.joinCode ?? '', trip.name)}
       />
 
       <ConfirmModal
