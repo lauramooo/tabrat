@@ -185,7 +185,8 @@ function ExpenseQuickModal({ item, onClose }: { item: SplitRecord; onClose: () =
         <>
           <Text style={qst.sectionLabel}>WHO'S PAID</Text>
           {people.map((person, i) => {
-            if (person.id === paidById) return null;
+            // Someone treated as a gift owes nothing, so there's nothing to mark paid.
+            if (person.id === paidById || live.coveredPeople?.includes(person.name)) return null;
             const status = statuses.find((s) => s.personId === person.id);
             const paid = status?.paid ?? false;
             const amount = amounts.find((a) => a.name === person.name)?.amount ?? 0;

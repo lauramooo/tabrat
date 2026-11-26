@@ -52,9 +52,9 @@ export function JoinCodeModal({ visible, onClose }: { visible: boolean; onClose:
           <FieldLabel style={{ marginBottom: 0 }}>CODE</FieldLabel>
           <Input
             value={code}
-            onChangeText={(t) => { setCode(t.toUpperCase()); setError(null); }}
-            placeholder="ABC123"
-            autoCapitalize="characters"
+            onChangeText={(t) => { setCode(t.replace(/\D/g, '')); setError(null); }}
+            placeholder="123456"
+            keyboardType="number-pad"
             autoCorrect={false}
             maxLength={6}
             onSubmitEditing={handleJoin}

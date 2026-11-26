@@ -84,6 +84,8 @@ export function syncUpsertSplitRecord(r: SplitRecord) {
     join_code: r.joinCode,
     // Only sent once set, so rows without a range don't depend on migration 0009's column.
     ...(r.receiptEndDate !== undefined && { receipt_end_date: r.receiptEndDate }),
+    // Gift split (migration 0010) — only sent when used, same as receipt_end_date.
+    ...(r.coveredPeople?.length && { covered_people: r.coveredPeople, covered_by: r.coveredBy ?? [] }),
   }));
 }
 export function syncDeleteSplitRecord(id: string) {

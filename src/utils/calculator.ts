@@ -44,6 +44,25 @@ export function calculateSplits(
   });
 }
 
+// Each participant's share of a single-amount expense, split equally — except people being treated
+// (`covered`), who owe nothing; their shares are split equally among `coveredBy` on top of what
+// those people already owe. Covered people still appear (at 0) so the expense shows who was there.
+export function splitWithGifts(
+  total: number,
+  participants: string[],
+  covered: string[] = [],
+  coveredBy: string[] = [],
+): Array<{ name: string; amount: number }> {
+  const share = total / (participants.length || 1);
+  const treated = participants.filter((p) => covered.includes(p));
+  const payers = coveredBy.filter((p) => participants.includes(p) && !covered.includes(p));
+  const extra = payers.length > 0 ? (share * treated.length) / payers.length : 0;
+  return participants.map((name) => ({
+    name,
+    amount: payers.length > 0 && treated.includes(name) ? 0 : share + (payers.includes(name) ? extra : 0),
+  }));
+}
+
 // Derived from the shared currency list (src/constants/currencies.ts) rather than a separate
 // hardcoded map — previously this had its own drifted-out-of-sync copy of symbols that was
 // missing most of the currencies selectable elsewhere in the app, so picking one of those showed

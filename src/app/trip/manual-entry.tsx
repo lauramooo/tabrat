@@ -14,7 +14,7 @@ import { PersonChip } from '@/components/PersonChip';
 import { InputMetrics, Radius } from '@/constants/spacing';
 import { useSplitStore } from '@/store/useSplitStore';
 import { useMyName, sortWithMeFirst } from '@/utils/sortPeople';
-import { fmt, getCurrencySymbol, sanitizeNumberInput } from '@/utils/calculator';
+import { fmt, getCurrencySymbol, sanitizeNumberInput, splitWithGifts } from '@/utils/calculator';
 import { fmtDate, parseLocalDate } from '@/utils/date';
 import { lightHaptic, mediumHaptic, selectionHaptic } from '@/utils/haptics';
 import { applyTextShortcuts } from '@/utils/text';
@@ -99,6 +99,9 @@ export default function ManualEntryScreen() {
   const [amountFocused, setAmountFocused] = useState(false);
   const [participants, setParticipants] = useState<string[]>(tripPeople);
   const [paidByName, setPaidByName] = useState<string | null>(tripPeople[0] ?? null);
+  // Gift split: `covered` participants owe nothing; `coveredBy` split their shares.
+  const [covered, setCovered] = useState<string[]>([]);
+  const [coveredBy, setCoveredBy] = useState<string[]>([]);
   const [receiptUri, setReceiptUri] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
@@ -112,6 +115,8 @@ export default function ManualEntryScreen() {
       setEndDate('');
       setParticipants(tripPeople);
       setPaidByName(tripPeople[0] ?? null);
+      setCovered([]);
+      setCoveredBy([]);
       setExpenseCurrency(initialCurrency);
       setReceiptUri(undefined);
     }
@@ -128,6 +133,8 @@ export default function ManualEntryScreen() {
     setAmountText(record.total > 0 ? String(record.total) : '');
     setParticipants(record.people);
     setPaidByName(record.paidByName ?? null);
+    setCovered(record.coveredPeople ?? []);
+    setCoveredBy(record.coveredBy ?? []);
     if (record.currency) setExpenseCurrency(record.currency);
     setReceiptUri(record.imageUri);
   }, []);
@@ -197,6 +204,29 @@ export default function ManualEntryScreen() {
     // splitting the cost themselves, so removing them as a participant shouldn't clear them
     // as the payer.
     setParticipants((prev) => (prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name]));
+    // Someone no longer on the expense can't be treated or be treating anyone on it.
+    setCovered((prev) => prev.filter((p) => p !== name));
+    setCoveredBy((prev) => prev.filter((p) => p !== name));
+  };
+
+  const toggleCovered = (name: string) => {
+    selectionHaptic();
+    const next = covered.includes(name) ? covered.filter((p) => p !== name) : [...covered, name];
+    setCovered(next);
+    const stillCovering = coveredBy.filter((p) => !next.includes(p));
+    // First person treated: start with whoever paid as the one covering, if they can be.
+    if (next.length > 0 && stillCovering.length === 0 && paidByName && participants.includes(paidByName) && !next.includes(paidByName)) {
+      setCoveredBy([paidByName]);
+    } else {
+      setCoveredBy(stillCovering);
+    }
+    setError(null);
+  };
+
+  const toggleCoveredBy = (name: string) => {
+    selectionHaptic();
+    setCoveredBy((prev) => (prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name]));
+    setError(null);
   };
 
   // Deliberately always lands on the trip's home page rather than popping back to whatever
@@ -215,6 +245,7 @@ export default function ManualEntryScreen() {
     if (!expenseName.trim()) { setError('Enter an expense name.'); return; }
     if (!amount || amount <= 0) { setError('Enter an amount.'); return; }
     if (participants.length === 0) { setError('Select at least one participant.'); return; }
+    if (covered.length > 0 && coveredBy.length === 0) { setError("Pick who's covering the people being treated."); return; }
     setError(null);
     mediumHaptic();
     if (expenseId) deleteHistory(expenseId);
@@ -229,6 +260,8 @@ export default function ManualEntryScreen() {
       tripId: tripId!,
       currency: expenseCurrency,
       imageUri: receiptUri,
+      coveredPeople: covered,
+      coveredBy,
     });
     goBack();
   };
@@ -386,6 +419,39 @@ export default function ManualEntryScreen() {
                   <PersonChip key={name} name={name} index={i} selected={participants.includes(name)} onPress={() => toggleParticipant(name)} />
                 ))}
               </View>
+            </>
+          )}
+
+          {/* -- Gifts -- optional: some participants are being treated, and others split their
+              shares (e.g. Mom and Laura cover Ruben's and Leidy's tickets). */}
+          {participants.length > 1 && (
+            <>
+              <FieldLabel style={{ marginTop: 20 }}>COVERED AS A GIFT  (OPTIONAL)</FieldLabel>
+              <Text style={s.hintText}>{"Tap anyone who's being treated — they won't owe anything."}</Text>
+              <View style={s.chipsWrap}>
+                {participants.map((name) => (
+                  <PersonChip key={name} name={name} index={tripPeople.indexOf(name)} selected={covered.includes(name)} onPress={() => toggleCovered(name)} />
+                ))}
+              </View>
+              {covered.length > 0 && (
+                <>
+                  <FieldLabel style={{ marginTop: 16 }}>{"WHO'S COVERING THEM?"}</FieldLabel>
+                  <View style={s.chipsWrap}>
+                    {participants.filter((name) => !covered.includes(name)).map((name) => (
+                      <PersonChip key={name} name={name} index={tripPeople.indexOf(name)} selected={coveredBy.includes(name)} onPress={() => toggleCoveredBy(name)} />
+                    ))}
+                  </View>
+                  {amount > 0 && coveredBy.length > 0 && (
+                    <View style={s.perDayBanner}>
+                      {splitWithGifts(amount, participants, covered, coveredBy).map(({ name, amount: owed }, i) => (
+                        <Text key={name} style={s.perDayItem}>
+                          {i > 0 ? '·  ' : ''}{name} <Text style={s.perDayVal}>{covered.includes(name) ? 'gift' : fmt(owed, expenseCurrency)}</Text>
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
             </>
           )}
 
@@ -602,6 +668,7 @@ const s = StyleSheet.create({
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
   noParticipantsNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 16, paddingHorizontal: 4 },
+  hintText: { ...Type.cardDesc, color: C.textSub, marginBottom: 8 },
   noParticipantsText: { flex: 1, ...Type.cardDesc, color: C.textDim, lineHeight: 18 },
 
   // Footer

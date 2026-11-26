@@ -53,6 +53,8 @@ export async function pullRemoteStateAndReplace(userId: string) {
     paidById: r.paid_by_id ?? undefined, paidByName: r.paid_by_name ?? undefined,
     tripId: r.trip_id ?? undefined, homeId: r.home_id ?? undefined,
     personAmounts: (r.person_amounts ?? undefined) as { name: string; amount: number }[] | undefined,
+    coveredPeople: r.covered_people?.length ? r.covered_people : undefined,
+    coveredBy: r.covered_by?.length ? r.covered_by : undefined,
     expenseCategory: r.expense_category ?? undefined, status: r.status ?? undefined, currency: r.currency ?? undefined,
     payers: (r.payers ?? undefined) as Payer[] | undefined,
     paymentStatuses: (r.payment_statuses ?? undefined) as PaymentStatus[] | undefined,

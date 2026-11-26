@@ -1,10 +1,7 @@
-// Excludes 0/O/1/I/L so a code stays unambiguous when read aloud or hand-typed.
-const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-
+// Digits only, so the join box can use the number keypad. The database enforces the same shape
+// (migration 0010) and swaps in a fresh code if one is ever taken already.
 export function generateJoinCode(length = 6): string {
   let code = '';
-  for (let i = 0; i < length; i++) {
-    code += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
-  }
+  for (let i = 0; i < length; i++) code += Math.floor(Math.random() * 10);
   return code;
 }

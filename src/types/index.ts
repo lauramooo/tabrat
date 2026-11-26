@@ -119,6 +119,8 @@ export interface SplitRecord {
   tripId?: string;
   homeId?: string;
   personAmounts?: Array<{ name: string; amount: number }>;
+  coveredPeople?: string[];        // trip expense: participants being treated — they owe $0 …
+  coveredBy?: string[];            // … and these participants split their shares (see splitWithGifts)
   expenseCategory?: string;
   status?: OpenClosedStatus;       // defaults to 'open' on save; 'closed' once settled
   currency?: string;               // ISO code, defaults to 'USD' if unset

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ExtraCharge, Group, Home, OpenClosedStatus, ParsedReceipt, Payer, PaymentStatus, Person, ReceiptItem, SplitRecord, Trip } from '@/types';
+import { splitWithGifts } from '@/utils/calculator';
 import { fmtDate } from '@/utils/date';
 import { extrasTotal } from '@/utils/items';
 import { generateJoinCode } from '@/utils/joinCode';
@@ -149,6 +150,8 @@ interface SplitState {
     tripId: string;
     currency?: string;
     imageUri?: string;
+    coveredPeople?: string[];
+    coveredBy?: string[];
   }) => void;
   startTripEntry: (tripId: string) => void;
   setActiveTripId: (id: string | null) => void;
@@ -822,13 +825,12 @@ export const useSplitStore = create<SplitState>()(
         syncProfileCategories({ homeExpenseCategories: get().homeExpenseCategories });
       },
 
-      saveTripExpenseDirectly: ({ name, receiptDate, receiptEndDate, category, rawItems, participants, paidByName, tripId, currency: expCurrency, imageUri }) => {
+      saveTripExpenseDirectly: ({ name, receiptDate, receiptEndDate, category, rawItems, participants, paidByName, tripId, currency: expCurrency, imageUri, coveredPeople, coveredBy }) => {
         if (rawItems.length === 0) return;
         const total = rawItems.reduce((s, i) => s + i.price, 0);
-        const n = participants.length || 1;
-        const share = total / n;
         const personIds = participants.map(() => uid());
-        const personAmounts = participants.map((pName, i) => ({ name: pName, amount: share }));
+        const gifted = coveredPeople?.length && coveredBy?.length ? { coveredPeople, coveredBy } : undefined;
+        const personAmounts = splitWithGifts(total, participants, gifted?.coveredPeople, gifted?.coveredBy);
         const record: SplitRecord = {
           id: uid(),
           date: new Date().toISOString(),
@@ -847,13 +849,16 @@ export const useSplitStore = create<SplitState>()(
           paidByName: paidByName || undefined,
           tripId,
           personAmounts,
+          ...gifted,
           expenseCategory: category || undefined,
           status: 'open',
           currency: expCurrency ?? get().trips.find((t) => t.id === tripId)?.currency ?? 'USD',
           payers: paidByName
             ? [{ personId: personIds[participants.indexOf(paidByName)] ?? personIds[0], amount: total }]
             : undefined,
-          paymentStatuses: participants.map((_, i) => ({ personId: personIds[i], paid: false, amountPaid: 0 })),
+          // People treated as a gift owe nothing, so they start settled — otherwise the expense
+          // could never close, since nobody would ever mark them paid.
+          paymentStatuses: participants.map((pName, i) => ({ personId: personIds[i], paid: !!gifted?.coveredPeople.includes(pName), amountPaid: 0 })),
           source: 'manual',
         };
         set((s) => ({ history: [record, ...s.history].slice(0, 50) }));
@@ -906,11 +911,19 @@ export const useSplitStore = create<SplitState>()(
 // Payment statuses carry over for people still on the bill; anyone newly added starts unpaid.
 let billSyncTimer: ReturnType<typeof setTimeout> | null = null;
 useSplitStore.subscribe((s, prev) => {
+  // A new bill is saved the moment it has items (a scan lands, or the first one is typed in), so
+  // backing out of the flow or jumping to another tab can't lose it — from then on the edits below
+  // keep it current, and it can be reopened from the feed.
+  if (!s.savedSplitId && !prev.savedSplitId && prev.items.length === 0 && s.items.length > 0) {
+    s.saveSplit();
+    return;
+  }
   const id = s.savedSplitId;
   if (!id || id !== prev.savedSplitId) return; // nothing open, or the bill was just loaded
   if (s.items === prev.items && s.people === prev.people && s.tax === prev.tax && s.tip === prev.tip
     && s.extraCharges === prev.extraCharges && s.paidBy === prev.paidBy && s.payers === prev.payers
-    && s.currency === prev.currency) return;
+    && s.currency === prev.currency && s.restaurantName === prev.restaurantName
+    && s.receiptDate === prev.receiptDate && s.imageUri === prev.imageUri) return;
 
   const content = billContent(s);
   useSplitStore.setState((st) => ({
