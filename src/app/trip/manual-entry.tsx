@@ -102,6 +102,7 @@ export default function ManualEntryScreen() {
   // Gift split: `covered` participants owe nothing; `coveredBy` split their shares.
   const [covered, setCovered] = useState<string[]>([]);
   const [coveredBy, setCoveredBy] = useState<string[]>([]);
+  const [giftOpen, setGiftOpen] = useState(false);
   const [receiptUri, setReceiptUri] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,6 +118,7 @@ export default function ManualEntryScreen() {
       setPaidByName(tripPeople[0] ?? null);
       setCovered([]);
       setCoveredBy([]);
+      setGiftOpen(false);
       setExpenseCurrency(initialCurrency);
       setReceiptUri(undefined);
     }
@@ -135,6 +137,7 @@ export default function ManualEntryScreen() {
     setPaidByName(record.paidByName ?? null);
     setCovered(record.coveredPeople ?? []);
     setCoveredBy(record.coveredBy ?? []);
+    setGiftOpen(!!record.coveredPeople?.length);
     if (record.currency) setExpenseCurrency(record.currency);
     setReceiptUri(record.imageUri);
   }, []);
@@ -422,39 +425,6 @@ export default function ManualEntryScreen() {
             </>
           )}
 
-          {/* -- Gifts -- optional: some participants are being treated, and others split their
-              shares (e.g. Mom and Laura cover Ruben's and Leidy's tickets). */}
-          {participants.length > 1 && (
-            <>
-              <FieldLabel style={{ marginTop: 20 }}>COVERED AS A GIFT  (OPTIONAL)</FieldLabel>
-              <Text style={s.hintText}>{"Tap anyone who's being treated — they won't owe anything."}</Text>
-              <View style={s.chipsWrap}>
-                {participants.map((name) => (
-                  <PersonChip key={name} name={name} index={tripPeople.indexOf(name)} selected={covered.includes(name)} onPress={() => toggleCovered(name)} />
-                ))}
-              </View>
-              {covered.length > 0 && (
-                <>
-                  <FieldLabel style={{ marginTop: 16 }}>{"WHO'S COVERING THEM?"}</FieldLabel>
-                  <View style={s.chipsWrap}>
-                    {participants.filter((name) => !covered.includes(name)).map((name) => (
-                      <PersonChip key={name} name={name} index={tripPeople.indexOf(name)} selected={coveredBy.includes(name)} onPress={() => toggleCoveredBy(name)} />
-                    ))}
-                  </View>
-                  {amount > 0 && coveredBy.length > 0 && (
-                    <View style={s.perDayBanner}>
-                      {splitWithGifts(amount, participants, covered, coveredBy).map(({ name, amount: owed }, i) => (
-                        <Text key={name} style={s.perDayItem}>
-                          {i > 0 ? '·  ' : ''}{name} <Text style={s.perDayVal}>{covered.includes(name) ? 'gift' : fmt(owed, expenseCurrency)}</Text>
-                        </Text>
-                      ))}
-                    </View>
-                  )}
-                </>
-              )}
-            </>
-          )}
-
           {/* -- Who paid -- shows everyone on the trip, not just participants: someone can cover
               an expense they didn't personally share in (e.g. paying for a group activity they
               skipped), so the payer isn't restricted to the participant list. */}
@@ -472,6 +442,48 @@ export default function ManualEntryScreen() {
                   />
                 ))}
               </View>
+            </>
+          )}
+
+          {/* -- Gifts -- hidden behind "Was any of this a gift?": some participants are being
+              treated, and others split their shares (e.g. Mom and Laura cover Ruben's and Leidy's
+              tickets). Collapsing it clears the picks, so a hidden section never changes the split. */}
+          {participants.length > 1 && (
+            <>
+              <PressBtn style={s.giftToggle} onPress={() => { selectionHaptic(); if (giftOpen) { setCovered([]); setCoveredBy([]); } setGiftOpen(!giftOpen); }} activeOpacity={0.7} noShadow>
+                <Text style={s.giftToggleText}>Was any of this a gift?</Text>
+                {giftOpen ? <ChevronUpCircleIcon size={15} color={C.textSub} /> : <ChevronDownCircleIcon size={15} color={C.textSub} />}
+              </PressBtn>
+              {giftOpen && (
+                <>
+                  <FieldLabel style={{ marginTop: 12 }}>{"WHO'S BEING TREATED?"}</FieldLabel>
+                  <Text style={s.hintText}>{"They won't owe anything."}</Text>
+                  <View style={s.chipsWrap}>
+                    {participants.map((name) => (
+                      <PersonChip key={name} name={name} index={tripPeople.indexOf(name)} selected={covered.includes(name)} onPress={() => toggleCovered(name)} />
+                    ))}
+                  </View>
+                  {covered.length > 0 && (
+                    <>
+                      <FieldLabel style={{ marginTop: 16 }}>{"WHO'S COVERING THEM?"}</FieldLabel>
+                      <View style={s.chipsWrap}>
+                        {participants.filter((name) => !covered.includes(name)).map((name) => (
+                          <PersonChip key={name} name={name} index={tripPeople.indexOf(name)} selected={coveredBy.includes(name)} onPress={() => toggleCoveredBy(name)} />
+                        ))}
+                      </View>
+                      {amount > 0 && coveredBy.length > 0 && (
+                        <View style={s.perDayBanner}>
+                          {splitWithGifts(amount, participants, covered, coveredBy).map(({ name, amount: owed }, i) => (
+                            <Text key={name} style={s.perDayItem}>
+                              {i > 0 ? '·  ' : ''}{name} <Text style={s.perDayVal}>{covered.includes(name) ? 'gift' : fmt(owed, expenseCurrency)}</Text>
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
             </>
           )}
 
@@ -668,6 +680,8 @@ const s = StyleSheet.create({
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
   noParticipantsNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 16, paddingHorizontal: 4 },
+  giftToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 16, paddingVertical: 4 },
+  giftToggleText: { ...Type.cardDesc, color: C.textSub, textDecorationLine: 'underline' },
   hintText: { ...Type.cardDesc, color: C.textSub, marginBottom: 8 },
   noParticipantsText: { flex: 1, ...Type.cardDesc, color: C.textDim, lineHeight: 18 },
 
