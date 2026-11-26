@@ -11,7 +11,9 @@
       "bundleIdentifier": "com.lauramooo.tabrat",
       "buildNumber": "1",
       "supportsTablet": false,
-      "associatedDomains": ["applinks:lauramooo.github.io"],
+      "associatedDomains": [
+        "applinks:lauramooo.github.io"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -72,6 +74,12 @@
         "projectId": "5cf6ee0b-8c3d-4197-abbc-bce73449ad18"
       }
     },
-    "owner": "lauramooo"
+    "owner": "lauramooo",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/5cf6ee0b-8c3d-4197-abbc-bce73449ad18"
+    }
   }
 }

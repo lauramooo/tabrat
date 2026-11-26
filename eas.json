@@ -21,7 +21,8 @@
       },
       "android": {
         "resourceClass": "medium"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
@@ -31,7 +32,8 @@
       },
       "android": {
         "resourceClass": "medium"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {
