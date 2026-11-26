@@ -6,10 +6,11 @@ export function generateJoinCode(length = 6): string {
   return code;
 }
 
-// A plain https link (custom app schemes aren't tappable in most messaging apps): the page at
-// docs/join.html (GitHub Pages) hands off to tabrat://join/<code>, which src/app/join/[code].tsx
-// redeems — or shows the code to type in if the app isn't installed.
-const JOIN_PAGE = 'https://lauramooo.github.io/tabrat/join.html';
+// A Universal Link: with Tab Rat installed, iOS opens it straight in the app (verified by the
+// apple-app-site-association file in the lauramooo.github.io repo), and src/app/+native-intent.tsx
+// routes it to the join screen. Without the app, it falls back to docs/join.html, which shows the
+// code to enter. Custom-scheme links (tabrat://) aren't tappable in most messaging apps.
+const JOIN_PAGE = 'https://lauramooo.github.io/tabrat/join';
 
 export function joinLink(code: string): string {
   return `${JOIN_PAGE}?code=${encodeURIComponent(code)}`;

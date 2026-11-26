@@ -99,10 +99,13 @@ export default function RootLayout() {
   useEffect(() => {
     if (!openedUrl) return;
     // tabrat://join/123456 parses as host "join" + path "123456"; a dev (exp://…/--/join/123456)
-    // link has it all in the path — joining the two covers both.
-    const { hostname, path } = Linking.parse(openedUrl);
+    // link has it all in the path; the Universal Link (…/tabrat/join?code=123456) carries it as a
+    // query param.
+    const { hostname, path, queryParams } = Linking.parse(openedUrl);
     const m = /(?:^|\/)join\/(\d{6})$/.exec([hostname, path].filter(Boolean).join('/'));
-    if (m) pendingJoinCode.current = m[1];
+    const q = /(?:^|\/)join(?:\.html)?$/.test(path ?? '') ? String(queryParams?.code ?? '') : '';
+    const code = m?.[1] ?? (/^\d{6}$/.test(q) ? q : null);
+    if (code) pendingJoinCode.current = code;
   }, [openedUrl]);
 
   useEffect(() => {
